@@ -28,53 +28,43 @@ function loadProductos(): Producto[] {
   return cache;
 }
 
-export function getProveedores(): string[] {
-  const productos = loadProductos();
-  return Array.from(new Set(productos.map((p) => p.proveedor))).sort();
-}
+export type ProductoColumnKey =
+  | "proveedor"
+  | "marca"
+  | "sku"
+  | "descripcion"
+  | "seccion"
+  | "precioNeto"
+  | "precioConIva"
+  | "alicuotaIva"
+  | "fechaVigencia";
 
-export function getMarcas(proveedor?: string): string[] {
-  const productos = loadProductos();
-  const marcas = productos
-    .filter((p) => !proveedor || p.proveedor === proveedor)
-    .map((p) => p.marca)
-    .filter((m): m is string => Boolean(m));
-  return Array.from(new Set(marcas)).sort();
-}
-
-export function getSecciones(): string[] {
-  const productos = loadProductos();
-  const secciones = productos
-    .map((p) => p.seccion)
-    .filter((s): s is string => Boolean(s));
-  return Array.from(new Set(secciones)).sort();
-}
-
-export function getFechasVigencia(): string[] {
-  const productos = loadProductos();
-  const fechas = productos
-    .map((p) => p.fecha_vigencia)
-    .filter((f): f is string => Boolean(f));
-  return Array.from(new Set(fechas)).sort().reverse();
-}
-
-export function getAlicuotasIva(): number[] {
-  const productos = loadProductos();
-  const alicuotas = productos
-    .map((p) => p.alicuota_iva)
-    .filter((a): a is number => a !== null && a !== undefined);
-  return Array.from(new Set(alicuotas)).sort((a, b) => a - b);
+function getColumnValue(p: Producto, key: ProductoColumnKey): string {
+  switch (key) {
+    case "proveedor":
+      return p.proveedor ?? "";
+    case "marca":
+      return p.marca ?? "";
+    case "sku":
+      return p.sku_interno ?? p.sku_proveedor ?? "";
+    case "descripcion":
+      return p.descripcion ?? "";
+    case "seccion":
+      return p.seccion ?? "";
+    case "precioNeto":
+      return p.precio_neto !== null ? String(p.precio_neto) : "";
+    case "precioConIva":
+      return p.precio_con_iva !== null ? String(p.precio_con_iva) : "";
+    case "alicuotaIva":
+      return p.alicuota_iva !== null ? String(p.alicuota_iva) : "";
+    case "fechaVigencia":
+      return p.fecha_vigencia ?? "";
+  }
 }
 
 export type QueryParams = {
-  proveedor?: string;
-  marca?: string;
-  seccion?: string;
-  fechaVigencia?: string;
-  alicuotaIva?: number;
-  precioMin?: number;
-  precioMax?: number;
   search?: string;
+  columnFilters?: Partial<Record<ProductoColumnKey, string>>;
   page: number;
   pageSize: number;
 };
@@ -88,31 +78,21 @@ export type QueryResult = {
 };
 
 export function queryProductos({
-  proveedor,
-  marca,
-  seccion,
-  fechaVigencia,
-  alicuotaIva,
-  precioMin,
-  precioMax,
   search,
+  columnFilters,
   page,
   pageSize,
 }: QueryParams): QueryResult {
   const productos = loadProductos();
   const term = search?.trim() ? normalizeText(search.trim()) : undefined;
+  const activeColumnFilters = Object.entries(columnFilters ?? {})
+    .filter((entry): entry is [ProductoColumnKey, string] => Boolean(entry[1]?.trim()))
+    .map(([key, value]) => [key, normalizeText(value.trim())] as const);
 
   const filtered = productos.filter((p) => {
-    if (proveedor && p.proveedor !== proveedor) return false;
-    if (marca && p.marca !== marca) return false;
-    if (seccion && p.seccion !== seccion) return false;
-    if (fechaVigencia && p.fecha_vigencia !== fechaVigencia) return false;
-    if (alicuotaIva !== undefined && p.alicuota_iva !== alicuotaIva)
-      return false;
-    if (precioMin !== undefined && (p.precio_neto === null || p.precio_neto < precioMin))
-      return false;
-    if (precioMax !== undefined && (p.precio_neto === null || p.precio_neto > precioMax))
-      return false;
+    for (const [key, needle] of activeColumnFilters) {
+      if (!normalizeText(getColumnValue(p, key)).includes(needle)) return false;
+    }
     if (term) {
       const haystack = [
         p.proveedor,

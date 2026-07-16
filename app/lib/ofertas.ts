@@ -29,26 +29,40 @@ function loadOfertas(): Oferta[] {
   return cache;
 }
 
-export function getMarcasOfertas(): string[] {
-  const ofertas = loadOfertas();
-  return Array.from(new Set(ofertas.map((o) => o.marca))).sort();
-}
+export type OfertaColumnKey =
+  | "marca"
+  | "numeroOferta"
+  | "sku"
+  | "descripcion"
+  | "desdeCantidad"
+  | "descuento"
+  | "precioUnitario"
+  | "fechaOferta";
 
-export function getFechasOferta(): string[] {
-  const ofertas = loadOfertas();
-  return Array.from(new Set(ofertas.map((o) => o.fecha_oferta)))
-    .sort()
-    .reverse();
+function getColumnValue(o: Oferta, key: OfertaColumnKey): string {
+  switch (key) {
+    case "marca":
+      return o.marca ?? "";
+    case "numeroOferta":
+      return String(o.numero_oferta);
+    case "sku":
+      return o.sku_proveedor ?? "";
+    case "descripcion":
+      return o.descripcion ?? "";
+    case "desdeCantidad":
+      return String(o.desde_cantidad);
+    case "descuento":
+      return String(o.descuento_pct);
+    case "precioUnitario":
+      return String(o.precio_unitario);
+    case "fechaOferta":
+      return o.fecha_oferta ?? "";
+  }
 }
 
 export type QueryOfertasParams = {
-  marca?: string;
-  fechaOferta?: string;
-  descuentoMin?: number;
-  descuentoMax?: number;
-  precioMin?: number;
-  precioMax?: number;
   search?: string;
+  columnFilters?: Partial<Record<OfertaColumnKey, string>>;
   page: number;
   pageSize: number;
 };
@@ -62,28 +76,21 @@ export type QueryOfertasResult = {
 };
 
 export function queryOfertas({
-  marca,
-  fechaOferta,
-  descuentoMin,
-  descuentoMax,
-  precioMin,
-  precioMax,
   search,
+  columnFilters,
   page,
   pageSize,
 }: QueryOfertasParams): QueryOfertasResult {
   const ofertas = loadOfertas();
   const term = search?.trim() ? normalizeText(search.trim()) : undefined;
+  const activeColumnFilters = Object.entries(columnFilters ?? {})
+    .filter((entry): entry is [OfertaColumnKey, string] => Boolean(entry[1]?.trim()))
+    .map(([key, value]) => [key, normalizeText(value.trim())] as const);
 
   const filtered = ofertas.filter((o) => {
-    if (marca && o.marca !== marca) return false;
-    if (fechaOferta && o.fecha_oferta !== fechaOferta) return false;
-    if (descuentoMin !== undefined && o.descuento_pct < descuentoMin)
-      return false;
-    if (descuentoMax !== undefined && o.descuento_pct > descuentoMax)
-      return false;
-    if (precioMin !== undefined && o.precio_unitario < precioMin) return false;
-    if (precioMax !== undefined && o.precio_unitario > precioMax) return false;
+    for (const [key, needle] of activeColumnFilters) {
+      if (!normalizeText(getColumnValue(o, key)).includes(needle)) return false;
+    }
     if (term) {
       const haystack = [
         o.proveedor,

@@ -34,10 +34,10 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value="catalogo">
-            <CatalogoView />
+            {tab === "catalogo" && <CatalogoView />}
           </TabsContent>
           <TabsContent value="ofertas">
-            <OfertasView />
+            {tab === "ofertas" && <OfertasView />}
           </TabsContent>
         </Tabs>
       </main>

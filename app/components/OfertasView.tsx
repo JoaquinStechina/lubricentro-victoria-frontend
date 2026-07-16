@@ -1,8 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import type { Oferta } from "@/app/lib/ofertas";
-import FilterSelect from "@/app/components/FilterSelect";
+import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
+import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import HighlightText from "@/app/components/HighlightText";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -22,11 +21,20 @@ type ApiResponse = {
   page: number;
   pageSize: number;
   totalPages: number;
-  marcas: string[];
-  fechasOferta: string[];
 };
 
 const PAGE_SIZE = 50;
+
+const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
+  marca: "",
+  numeroOferta: "",
+  sku: "",
+  descripcion: "",
+  desdeCantidad: "",
+  descuento: "",
+  precioUnitario: "",
+  fechaOferta: "",
+};
 
 const currencyFormatter = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -38,35 +46,30 @@ function formatPrecio(valor: number) {
 }
 
 export default function OfertasView() {
-  const [marca, setMarca] = useState("");
-  const [fechaOferta, setFechaOferta] = useState("");
-  const [descuentoMin, setDescuentoMin] = useState("");
-  const [descuentoMax, setDescuentoMax] = useState("");
-  const [precioMin, setPrecioMin] = useState("");
-  const [precioMax, setPrecioMax] = useState("");
   const [search, setSearch] = useState("");
+  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [debouncedDescuentoMin, setDebouncedDescuentoMin] = useState("");
-  const [debouncedDescuentoMax, setDebouncedDescuentoMax] = useState("");
-  const [debouncedPrecioMin, setDebouncedPrecioMin] = useState("");
-  const [debouncedPrecioMax, setDebouncedPrecioMax] = useState("");
+  const [debouncedColumnFilters, setDebouncedColumnFilters] = useState(
+    EMPTY_COLUMN_FILTERS
+  );
   useEffect(() => {
     const id = setTimeout(() => {
       setDebouncedSearch(search);
-      setDebouncedDescuentoMin(descuentoMin);
-      setDebouncedDescuentoMax(descuentoMax);
-      setDebouncedPrecioMin(precioMin);
-      setDebouncedPrecioMax(precioMax);
+      setDebouncedColumnFilters(columnFilters);
     }, 300);
     return () => clearTimeout(id);
-  }, [search, descuentoMin, descuentoMax, precioMin, precioMax]);
+  }, [search, columnFilters]);
 
-  const filterKey = `${marca}|${fechaOferta}|${debouncedDescuentoMin}|${debouncedDescuentoMax}|${debouncedPrecioMin}|${debouncedPrecioMax}|${debouncedSearch}`;
+  function setColumnFilter(key: OfertaColumnKey, value: string) {
+    setColumnFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -76,13 +79,10 @@ export default function OfertasView() {
   useEffect(() => {
     let active = true;
     const params = new URLSearchParams();
-    if (marca) params.set("marca", marca);
-    if (fechaOferta) params.set("fechaOferta", fechaOferta);
-    if (debouncedDescuentoMin) params.set("descuentoMin", debouncedDescuentoMin);
-    if (debouncedDescuentoMax) params.set("descuentoMax", debouncedDescuentoMax);
-    if (debouncedPrecioMin) params.set("precioMin", debouncedPrecioMin);
-    if (debouncedPrecioMax) params.set("precioMax", debouncedPrecioMax);
     if (debouncedSearch) params.set("search", debouncedSearch);
+    for (const [key, value] of Object.entries(debouncedColumnFilters)) {
+      if (value) params.set(`f_${key}`, value);
+    }
     params.set("page", String(page));
     params.set("pageSize", String(PAGE_SIZE));
 
@@ -104,37 +104,14 @@ export default function OfertasView() {
     return () => {
       active = false;
     };
-  }, [
-    marca,
-    fechaOferta,
-    debouncedDescuentoMin,
-    debouncedDescuentoMax,
-    debouncedPrecioMin,
-    debouncedPrecioMax,
-    debouncedSearch,
-    page,
-  ]);
-
-  const marcasDisponibles = data?.marcas ?? [];
-  const fechasOfertaDisponibles = data?.fechasOferta ?? [];
+  }, [debouncedSearch, debouncedColumnFilters, page]);
 
   const hayFiltrosActivos =
-    marca ||
-    fechaOferta ||
-    descuentoMin ||
-    descuentoMax ||
-    precioMin ||
-    precioMax ||
-    search;
+    search || Object.values(columnFilters).some((v) => v);
 
   function limpiarFiltros() {
-    setMarca("");
-    setFechaOferta("");
-    setDescuentoMin("");
-    setDescuentoMax("");
-    setPrecioMin("");
-    setPrecioMax("");
     setSearch("");
+    setColumnFilters(EMPTY_COLUMN_FILTERS);
   }
 
   const rangoResultados = useMemo(() => {
@@ -147,78 +124,6 @@ export default function OfertasView() {
   return (
     <>
       <section className="mb-4 flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <FilterSelect
-            label="Marca"
-            value={marca}
-            onChange={setMarca}
-            options={marcasDisponibles}
-            allLabel="Todas"
-          />
-
-          <FilterSelect
-            label="Fecha de oferta"
-            value={fechaOferta}
-            onChange={setFechaOferta}
-            options={fechasOfertaDisponibles}
-            allLabel="Todas"
-          />
-
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-600 dark:text-zinc-400">
-              Descuento (%)
-            </span>
-            <div className="flex gap-1">
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={100}
-                value={descuentoMin}
-                onChange={(e) => setDescuentoMin(e.target.value)}
-                placeholder="Mín"
-                className="w-1/2"
-              />
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={100}
-                value={descuentoMax}
-                onChange={(e) => setDescuentoMax(e.target.value)}
-                placeholder="Máx"
-                className="w-1/2"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-600 dark:text-zinc-400">
-              Precio unitario ($)
-            </span>
-            <div className="flex gap-1">
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={precioMin}
-                onChange={(e) => setPrecioMin(e.target.value)}
-                placeholder="Mín"
-                className="w-1/2"
-              />
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                value={precioMax}
-                onChange={(e) => setPrecioMax(e.target.value)}
-                placeholder="Máx"
-                className="w-1/2"
-              />
-            </div>
-          </div>
-        </div>
-
         <div className="flex items-end gap-3">
           <div className="flex flex-1 flex-col gap-1 text-sm">
             <Label htmlFor="ofertas-search" className="text-zinc-600 dark:text-zinc-400">
@@ -272,14 +177,49 @@ export default function OfertasView() {
         <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              <TableHead>Marca</TableHead>
-              <TableHead>N° oferta</TableHead>
-              <TableHead>SKU proveedor</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead className="text-right">Desde cant.</TableHead>
-              <TableHead className="text-right">Descuento</TableHead>
-              <TableHead className="text-right">Precio unitario</TableHead>
-              <TableHead>Vigencia</TableHead>
+              <ColumnFilterHeader
+                label="Marca"
+                value={columnFilters.marca}
+                onChange={(v) => setColumnFilter("marca", v)}
+              />
+              <ColumnFilterHeader
+                label="N° oferta"
+                value={columnFilters.numeroOferta}
+                onChange={(v) => setColumnFilter("numeroOferta", v)}
+              />
+              <ColumnFilterHeader
+                label="SKU proveedor"
+                value={columnFilters.sku}
+                onChange={(v) => setColumnFilter("sku", v)}
+              />
+              <ColumnFilterHeader
+                label="Descripción"
+                value={columnFilters.descripcion}
+                onChange={(v) => setColumnFilter("descripcion", v)}
+              />
+              <ColumnFilterHeader
+                label="Desde cant."
+                value={columnFilters.desdeCantidad}
+                onChange={(v) => setColumnFilter("desdeCantidad", v)}
+                align="right"
+              />
+              <ColumnFilterHeader
+                label="Descuento"
+                value={columnFilters.descuento}
+                onChange={(v) => setColumnFilter("descuento", v)}
+                align="right"
+              />
+              <ColumnFilterHeader
+                label="Precio unitario"
+                value={columnFilters.precioUnitario}
+                onChange={(v) => setColumnFilter("precioUnitario", v)}
+                align="right"
+              />
+              <ColumnFilterHeader
+                label="Vigencia"
+                value={columnFilters.fechaOferta}
+                onChange={(v) => setColumnFilter("fechaOferta", v)}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
