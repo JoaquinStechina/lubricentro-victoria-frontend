@@ -5,7 +5,6 @@ import type { Producto } from "@/app/lib/productos";
 import ComboboxFilter from "@/app/components/ComboboxFilter";
 import FilterSelect from "@/app/components/FilterSelect";
 import HighlightText from "@/app/components/HighlightText";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -237,14 +236,14 @@ export default function CatalogoView() {
         <div className="flex items-end gap-3">
           <div className="flex flex-1 flex-col gap-1 text-sm">
             <Label htmlFor="catalogo-search" className="text-zinc-600 dark:text-zinc-400">
-              Buscar por SKU o descripción
+              Buscar en todos los campos
             </Label>
             <Input
               id="catalogo-search"
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ej: 2351, filtro de aceite..."
+              placeholder="Ej: 2351, filtro de aceite, Bosch, Vigencia..."
             />
           </div>
 
@@ -322,10 +321,10 @@ export default function CatalogoView() {
                     className={hasRawData ? "cursor-pointer" : ""}
                   >
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {producto.proveedor}
+                      <HighlightText text={producto.proveedor} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {producto.marca ?? "—"}
+                      <HighlightText text={producto.marca ?? "—"} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
                       <HighlightText
@@ -338,29 +337,33 @@ export default function CatalogoView() {
                         text={producto.descripcion ?? "—"}
                         query={debouncedSearch}
                       />
-                      {hasRawData && (
-                        <Badge
-                          variant="outline"
-                          className="ml-2 border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                        >
-                          +datos sin mapear
-                        </Badge>
-                      )}
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {producto.seccion ?? "—"}
+                      <HighlightText text={producto.seccion ?? "—"} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
-                      {formatPrecio(producto.precio_neto)}
+                      <HighlightText
+                        text={formatPrecio(producto.precio_neto)}
+                        query={debouncedSearch}
+                      />
                     </TableCell>
                     <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
-                      {formatPrecio(producto.precio_con_iva)}
+                      <HighlightText
+                        text={formatPrecio(producto.precio_con_iva)}
+                        query={debouncedSearch}
+                      />
                     </TableCell>
                     <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      {producto.alicuota_iva ?? "—"}
+                      <HighlightText
+                        text={producto.alicuota_iva !== null ? String(producto.alicuota_iva) : "—"}
+                        query={debouncedSearch}
+                      />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {producto.fecha_vigencia ?? "—"}
+                      <HighlightText
+                        text={producto.fecha_vigencia ?? "—"}
+                        query={debouncedSearch}
+                      />
                     </TableCell>
                   </TableRow>
                   {isExpanded && hasRawData && (

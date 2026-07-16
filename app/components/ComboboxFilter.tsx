@@ -13,6 +13,11 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { normalizeText } from "@/app/lib/text";
+
+function filterAccentInsensitive(value: string, search: string) {
+  return normalizeText(value).includes(normalizeText(search)) ? 1 : 0;
+}
 
 type ComboboxFilterProps = {
   label: string;
@@ -46,7 +51,7 @@ export default function ComboboxFilter({
           <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
         </PopoverTrigger>
         <PopoverContent className="w-(--anchor-width) min-w-64 p-0" align="start">
-          <Command>
+          <Command filter={filterAccentInsensitive}>
             <CommandInput placeholder={searchPlaceholder} />
             <CommandList>
               <CommandEmpty>Sin resultados.</CommandEmpty>

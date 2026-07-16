@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { normalizeText } from "@/app/lib/text";
 
 export type Producto = {
   proveedor: string;
@@ -99,7 +100,7 @@ export function queryProductos({
   pageSize,
 }: QueryParams): QueryResult {
   const productos = loadProductos();
-  const term = search?.trim().toLowerCase();
+  const term = search?.trim() ? normalizeText(search.trim()) : undefined;
 
   const filtered = productos.filter((p) => {
     if (proveedor && p.proveedor !== proveedor) return false;
@@ -113,10 +114,23 @@ export function queryProductos({
     if (precioMax !== undefined && (p.precio_neto === null || p.precio_neto > precioMax))
       return false;
     if (term) {
-      const haystack = `${p.sku_interno ?? ""} ${p.sku_proveedor ?? ""} ${
-        p.descripcion ?? ""
-      }`.toLowerCase();
-      if (!haystack.includes(term)) return false;
+      const haystack = [
+        p.proveedor,
+        p.marca,
+        p.sku_interno,
+        p.sku_proveedor,
+        p.descripcion,
+        p.seccion,
+        p.precio_neto,
+        p.precio_con_iva,
+        p.alicuota_iva,
+        p.moneda,
+        p.unidad,
+        p.fecha_vigencia,
+      ]
+        .filter((v) => v !== null && v !== undefined)
+        .join(" ");
+      if (!normalizeText(haystack).includes(term)) return false;
     }
     return true;
   });

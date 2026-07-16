@@ -222,14 +222,14 @@ export default function OfertasView() {
         <div className="flex items-end gap-3">
           <div className="flex flex-1 flex-col gap-1 text-sm">
             <Label htmlFor="ofertas-search" className="text-zinc-600 dark:text-zinc-400">
-              Buscar por SKU o descripción
+              Buscar en todos los campos
             </Label>
             <Input
               id="ofertas-search"
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ej: 65/0001, S4 36 DA..."
+              placeholder="Ej: 65/0001, S4 36 DA, Bosch..."
             />
           </div>
 
@@ -304,10 +304,10 @@ export default function OfertasView() {
                     className="cursor-pointer"
                   >
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {oferta.marca}
+                      <HighlightText text={oferta.marca} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {oferta.numero_oferta}
+                      <HighlightText text={String(oferta.numero_oferta)} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
                       <HighlightText text={oferta.sku_proveedor} query={debouncedSearch} />
@@ -316,16 +316,16 @@ export default function OfertasView() {
                       <HighlightText text={oferta.descripcion} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      {oferta.desde_cantidad}
+                      <HighlightText text={String(oferta.desde_cantidad)} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      {oferta.descuento_pct}%
+                      <HighlightText text={`${oferta.descuento_pct}%`} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
-                      {formatPrecio(oferta.precio_unitario)}
+                      <HighlightText text={formatPrecio(oferta.precio_unitario)} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {oferta.fecha_oferta}
+                      <HighlightText text={oferta.fecha_oferta} query={debouncedSearch} />
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
