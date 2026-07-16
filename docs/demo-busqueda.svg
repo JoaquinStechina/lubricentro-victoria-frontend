@@ -1,0 +1,123 @@
+<svg viewBox="0 0 960 470" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="960" height="420" rx="16" fill="#09090b" stroke="#27272a" stroke-width="1"/>
+
+  <text x="32" y="40" font-size="20" font-weight="600" fill="#fafafa">Lubricentro Victoria</text>
+  <text x="32" y="62" font-size="13" fill="#a1a1aa">Catálogo centralizado de proveedores — demo de búsqueda</text>
+
+  <rect x="32" y="78" width="150" height="26" rx="13" fill="#27272a"/>
+  <text x="107" y="95" font-size="12" fill="#fafafa" text-anchor="middle">Catálogo (31.586)</text>
+  <text x="250" y="95" font-size="12" fill="#71717a" text-anchor="middle">Ofertas (1.018)</text>
+
+  <g fill="#18181b" stroke="#3f3f46" stroke-width="1">
+    <rect x="32" y="118" width="142" height="30" rx="8"/>
+    <rect x="182" y="118" width="142" height="30" rx="8"/>
+    <rect x="332" y="118" width="142" height="30" rx="8"/>
+    <rect x="482" y="118" width="142" height="30" rx="8"/>
+    <rect x="632" y="118" width="142" height="30" rx="8"/>
+    <rect x="782" y="118" width="146" height="30" rx="8"/>
+  </g>
+  <g font-size="11" fill="#71717a">
+    <text x="48" y="137">Proveedor</text>
+    <text x="198" y="137">Marca</text>
+    <text x="348" y="137">Sección</text>
+    <text x="498" y="137">Vigencia</text>
+    <text x="648" y="137">IVA</text>
+    <text x="798" y="137">Precio neto ($)</text>
+  </g>
+
+  <rect x="32" y="160" width="896" height="34" rx="8" fill="#18181b" stroke="#3f3f46"/>
+  <circle cx="50" cy="176" r="5" fill="none" stroke="#71717a" stroke-width="1.5"/>
+  <line x1="54" y1="180" x2="59" y2="185" stroke="#71717a" stroke-width="1.5" stroke-linecap="round"/>
+
+  <text x="70" y="182" font-size="13" fill="#71717a">
+    Buscar en todos los campos
+    <animate attributeName="opacity" values="1;1;0;0;1;1;1" keyTimes="0;0.30;0.40;0.88;0.92;0.97;1" dur="8s" repeatCount="indefinite"/>
+  </text>
+  <text x="70" y="182" font-size="14" font-weight="500" fill="#fafafa">
+    bateria
+    <animate attributeName="opacity" values="0;0;1;1;0;0;0" keyTimes="0;0.30;0.40;0.88;0.92;0.97;1" dur="8s" repeatCount="indefinite"/>
+  </text>
+
+  <g>
+    <text x="32" y="210" font-size="12" fill="#a1a1aa">1–50 de 31.586</text>
+    <animate attributeName="opacity" values="1;1;0;0;1;1;1" keyTimes="0;0.30;0.40;0.88;0.92;0.97;1" dur="8s" repeatCount="indefinite"/>
+  </g>
+  <g>
+    <text x="32" y="210" font-size="12" fill="#a1a1aa">1–50 de 216</text>
+    <animate attributeName="opacity" values="0;0;1;1;0;0;0" keyTimes="0;0.30;0.40;0.88;0.92;0.97;1" dur="8s" repeatCount="indefinite"/>
+  </g>
+
+  <g font-size="11" fill="#71717a">
+    <text x="32" y="234">MARCA</text>
+    <text x="140" y="234">SKU</text>
+    <text x="260" y="234">DESCRIPCIÓN</text>
+    <text x="600" y="234">SECCIÓN</text>
+    <text x="928" y="234" text-anchor="end">PRECIO NETO</text>
+  </g>
+  <line x1="32" y1="246" x2="928" y2="246" stroke="#27272a"/>
+
+  <!-- Filas sin filtrar -->
+  <g font-size="13">
+    <animate attributeName="opacity" values="1;1;0;0;1;1;1" keyTimes="0;0.30;0.40;0.88;0.92;0.97;1" dur="8s" repeatCount="indefinite"/>
+    <text x="32" y="272" fill="#d4d4d8">OSRAM</text>
+    <text x="140" y="272" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">2351</text>
+    <text x="260" y="272" fill="#f4f4f5">LAMP.TABL/POS 12V-1.2W - MF</text>
+    <text x="600" y="272" font-size="12" fill="#a1a1aa">LÁMPARAS INCANDESCENTES</text>
+    <text x="928" y="272" text-anchor="end" fill="#f4f4f5">$ 1.985,78</text>
+
+    <text x="32" y="304" fill="#d4d4d8">OSRAM</text>
+    <text x="140" y="304" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">2352</text>
+    <text x="260" y="304" fill="#f4f4f5">LAMP.TABL/POS 12V - 2W (UE200)</text>
+    <text x="600" y="304" font-size="12" fill="#a1a1aa">LÁMPARAS INCANDESCENTES</text>
+    <text x="928" y="304" text-anchor="end" fill="#f4f4f5">$ 2.118,00</text>
+
+    <text x="32" y="336" fill="#d4d4d8">OSRAM</text>
+    <text x="140" y="336" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">2504</text>
+    <text x="260" y="336" fill="#f4f4f5">LAMPARA HALOGENA 12V-PSX24W</text>
+    <text x="600" y="336" font-size="12" fill="#a1a1aa">LÁMPARAS HALÓGENAS</text>
+    <text x="928" y="336" text-anchor="end" fill="#f4f4f5">$ 36.105,84</text>
+
+    <text x="32" y="368" fill="#d4d4d8">OSRAM</text>
+    <text x="140" y="368" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">2721</text>
+    <text x="260" y="368" fill="#f4f4f5">LAMP.TABL/POSIC 12V-1.2W</text>
+    <text x="600" y="368" font-size="12" fill="#a1a1aa">LÁMPARAS INCANDESCENTES</text>
+    <text x="928" y="368" text-anchor="end" fill="#f4f4f5">$ 976,06</text>
+  </g>
+
+  <!-- Filas filtradas por "bateria" (sin acento), con resaltado -->
+  <g font-size="13">
+    <animate attributeName="opacity" values="0;0;1;1;0;0;0" keyTimes="0;0.30;0.40;0.88;0.92;0.97;1" dur="8s" repeatCount="indefinite"/>
+
+    <text x="32" y="272" fill="#d4d4d8">BOSCH H.</text>
+    <text x="140" y="272" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">06008C8000</text>
+    <rect x="418" y="260" width="56" height="17" fill="#f59e0b" fill-opacity="0.35" rx="2"/>
+    <text x="260" y="272" fill="#f4f4f5">CORTADORA DE CESPED A BATERIA</text>
+    <text x="600" y="272" font-size="12" fill="#a1a1aa">LINEA AZUL</text>
+    <text x="928" y="272" text-anchor="end" fill="#f4f4f5">$ 1.229.094,76</text>
+
+    <text x="32" y="304" fill="#d4d4d8">BOSCH H.</text>
+    <text x="140" y="304" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">06008D70E0</text>
+    <rect x="338" y="292" width="56" height="17" fill="#f59e0b" fill-opacity="0.35" rx="2"/>
+    <text x="260" y="304" fill="#f4f4f5">PODADORA A BATERIA 3/8''</text>
+    <text x="600" y="304" font-size="12" fill="#a1a1aa">LINEA AZUL</text>
+    <text x="928" y="304" text-anchor="end" fill="#f4f4f5">$ 393.702,40</text>
+
+    <text x="32" y="336" fill="#d4d4d8">BOSCH H.</text>
+    <text x="140" y="336" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">06019N80E0</text>
+    <rect x="324" y="324" width="56" height="17" fill="#f59e0b" fill-opacity="0.35" rx="2"/>
+    <text x="260" y="336" fill="#f4f4f5">CRIQUE A BATERÍA GRC 18V-60</text>
+    <text x="600" y="336" font-size="12" fill="#a1a1aa">LINEA AZUL</text>
+    <text x="928" y="336" text-anchor="end" fill="#f4f4f5">$ 524.187,02</text>
+
+    <text x="32" y="368" fill="#d4d4d8">BOSCH H.</text>
+    <text x="140" y="368" font-family="Consolas, monospace" font-size="12" fill="#a1a1aa">1600A0021D</text>
+    <rect x="258" y="356" width="56" height="17" fill="#f59e0b" fill-opacity="0.35" rx="2"/>
+    <text x="260" y="368" fill="#f4f4f5">BATERIA LI-IO 12VOL MAX - 2AH</text>
+    <text x="600" y="368" font-size="12" fill="#a1a1aa">LINEA AZUL</text>
+    <text x="928" y="368" text-anchor="end" fill="#f4f4f5">$ 74.986,78</text>
+  </g>
+
+  <line x1="32" y1="386" x2="928" y2="386" stroke="#27272a"/>
+
+  <text x="480" y="450" font-size="12" fill="#71717a" text-anchor="middle">Se tipeó “bateria” (sin acento): resalta “BATERIA” y también “BATERÍA”, en toda la fila.</text>
+</svg>
