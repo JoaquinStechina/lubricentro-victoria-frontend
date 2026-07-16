@@ -33,8 +33,20 @@ export function getMarcasOfertas(): string[] {
   return Array.from(new Set(ofertas.map((o) => o.marca))).sort();
 }
 
+export function getFechasOferta(): string[] {
+  const ofertas = loadOfertas();
+  return Array.from(new Set(ofertas.map((o) => o.fecha_oferta)))
+    .sort()
+    .reverse();
+}
+
 export type QueryOfertasParams = {
   marca?: string;
+  fechaOferta?: string;
+  descuentoMin?: number;
+  descuentoMax?: number;
+  precioMin?: number;
+  precioMax?: number;
   search?: string;
   page: number;
   pageSize: number;
@@ -50,6 +62,11 @@ export type QueryOfertasResult = {
 
 export function queryOfertas({
   marca,
+  fechaOferta,
+  descuentoMin,
+  descuentoMax,
+  precioMin,
+  precioMax,
   search,
   page,
   pageSize,
@@ -59,6 +76,13 @@ export function queryOfertas({
 
   const filtered = ofertas.filter((o) => {
     if (marca && o.marca !== marca) return false;
+    if (fechaOferta && o.fecha_oferta !== fechaOferta) return false;
+    if (descuentoMin !== undefined && o.descuento_pct < descuentoMin)
+      return false;
+    if (descuentoMax !== undefined && o.descuento_pct > descuentoMax)
+      return false;
+    if (precioMin !== undefined && o.precio_unitario < precioMin) return false;
+    if (precioMax !== undefined && o.precio_unitario > precioMax) return false;
     if (term) {
       const haystack = `${o.sku_proveedor} ${o.descripcion}`.toLowerCase();
       if (!haystack.includes(term)) return false;

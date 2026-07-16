@@ -2,6 +2,19 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Oferta } from "@/app/lib/ofertas";
+import FilterSelect from "@/app/components/FilterSelect";
+import HighlightText from "@/app/components/HighlightText";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type ApiResponse = {
   items: Oferta[];
@@ -10,6 +23,7 @@ type ApiResponse = {
   pageSize: number;
   totalPages: number;
   marcas: string[];
+  fechasOferta: string[];
 };
 
 const PAGE_SIZE = 50;
@@ -25,6 +39,11 @@ function formatPrecio(valor: number) {
 
 export default function OfertasView() {
   const [marca, setMarca] = useState("");
+  const [fechaOferta, setFechaOferta] = useState("");
+  const [descuentoMin, setDescuentoMin] = useState("");
+  const [descuentoMax, setDescuentoMax] = useState("");
+  const [precioMin, setPrecioMin] = useState("");
+  const [precioMax, setPrecioMax] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -32,12 +51,22 @@ export default function OfertasView() {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedDescuentoMin, setDebouncedDescuentoMin] = useState("");
+  const [debouncedDescuentoMax, setDebouncedDescuentoMax] = useState("");
+  const [debouncedPrecioMin, setDebouncedPrecioMin] = useState("");
+  const [debouncedPrecioMax, setDebouncedPrecioMax] = useState("");
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search), 300);
+    const id = setTimeout(() => {
+      setDebouncedSearch(search);
+      setDebouncedDescuentoMin(descuentoMin);
+      setDebouncedDescuentoMax(descuentoMax);
+      setDebouncedPrecioMin(precioMin);
+      setDebouncedPrecioMax(precioMax);
+    }, 300);
     return () => clearTimeout(id);
-  }, [search]);
+  }, [search, descuentoMin, descuentoMax, precioMin, precioMax]);
 
-  const filterKey = `${marca}|${debouncedSearch}`;
+  const filterKey = `${marca}|${fechaOferta}|${debouncedDescuentoMin}|${debouncedDescuentoMax}|${debouncedPrecioMin}|${debouncedPrecioMax}|${debouncedSearch}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -48,6 +77,11 @@ export default function OfertasView() {
     let active = true;
     const params = new URLSearchParams();
     if (marca) params.set("marca", marca);
+    if (fechaOferta) params.set("fechaOferta", fechaOferta);
+    if (debouncedDescuentoMin) params.set("descuentoMin", debouncedDescuentoMin);
+    if (debouncedDescuentoMax) params.set("descuentoMax", debouncedDescuentoMax);
+    if (debouncedPrecioMin) params.set("precioMin", debouncedPrecioMin);
+    if (debouncedPrecioMax) params.set("precioMax", debouncedPrecioMax);
     if (debouncedSearch) params.set("search", debouncedSearch);
     params.set("page", String(page));
     params.set("pageSize", String(PAGE_SIZE));
@@ -70,9 +104,38 @@ export default function OfertasView() {
     return () => {
       active = false;
     };
-  }, [marca, debouncedSearch, page]);
+  }, [
+    marca,
+    fechaOferta,
+    debouncedDescuentoMin,
+    debouncedDescuentoMax,
+    debouncedPrecioMin,
+    debouncedPrecioMax,
+    debouncedSearch,
+    page,
+  ]);
 
   const marcasDisponibles = data?.marcas ?? [];
+  const fechasOfertaDisponibles = data?.fechasOferta ?? [];
+
+  const hayFiltrosActivos =
+    marca ||
+    fechaOferta ||
+    descuentoMin ||
+    descuentoMax ||
+    precioMin ||
+    precioMax ||
+    search;
+
+  function limpiarFiltros() {
+    setMarca("");
+    setFechaOferta("");
+    setDescuentoMin("");
+    setDescuentoMax("");
+    setPrecioMin("");
+    setPrecioMax("");
+    setSearch("");
+  }
 
   const rangoResultados = useMemo(() => {
     if (!data || data.total === 0) return "0 resultados";
@@ -83,125 +146,191 @@ export default function OfertasView() {
 
   return (
     <>
-      <section className="mb-4 flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:flex-row sm:items-end sm:gap-4">
-        <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="text-zinc-600 dark:text-zinc-400">Marca</span>
-          <select
+      <section className="mb-4 flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <FilterSelect
+            label="Marca"
             value={marca}
-            onChange={(e) => setMarca(e.target.value)}
-            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-          >
-            <option value="">Todas</option>
-            {marcasDisponibles.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-[2] flex-col gap-1 text-sm">
-          <span className="text-zinc-600 dark:text-zinc-400">
-            Buscar por SKU o descripción
-          </span>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ej: 65/0001, S4 36 DA..."
-            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-black placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+            onChange={setMarca}
+            options={marcasDisponibles}
+            allLabel="Todas"
           />
-        </label>
+
+          <FilterSelect
+            label="Fecha de oferta"
+            value={fechaOferta}
+            onChange={setFechaOferta}
+            options={fechasOfertaDisponibles}
+            allLabel="Todas"
+          />
+
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">
+              Descuento (%)
+            </span>
+            <div className="flex gap-1">
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                value={descuentoMin}
+                onChange={(e) => setDescuentoMin(e.target.value)}
+                placeholder="Mín"
+                className="w-1/2"
+              />
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                value={descuentoMax}
+                onChange={(e) => setDescuentoMax(e.target.value)}
+                placeholder="Máx"
+                className="w-1/2"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">
+              Precio unitario ($)
+            </span>
+            <div className="flex gap-1">
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={precioMin}
+                onChange={(e) => setPrecioMin(e.target.value)}
+                placeholder="Mín"
+                className="w-1/2"
+              />
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={precioMax}
+                onChange={(e) => setPrecioMax(e.target.value)}
+                placeholder="Máx"
+                className="w-1/2"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-end gap-3">
+          <div className="flex flex-1 flex-col gap-1 text-sm">
+            <Label htmlFor="ofertas-search" className="text-zinc-600 dark:text-zinc-400">
+              Buscar por SKU o descripción
+            </Label>
+            <Input
+              id="ofertas-search"
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Ej: 65/0001, S4 36 DA..."
+            />
+          </div>
+
+          {hayFiltrosActivos && (
+            <Button variant="outline" onClick={limpiarFiltros}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
       </section>
 
       <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
         <span>{loading ? "Cargando…" : rangoResultados}</span>
         {data && data.totalPages > 1 && (
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={data.page <= 1}
-              className="rounded-md border border-zinc-300 px-3 py-1 disabled:opacity-40 dark:border-zinc-700"
             >
               Anterior
-            </button>
+            </Button>
             <span>
               Página {data.page} de {data.totalPages}
             </span>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
               disabled={data.page >= data.totalPages}
-              className="rounded-md border border-zinc-300 px-3 py-1 disabled:opacity-40 dark:border-zinc-700"
             >
               Siguiente
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <table className="w-full min-w-[900px] text-left text-sm">
-          <thead className="border-b border-zinc-200 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
-            <tr>
-              <th className="px-4 py-3">Marca</th>
-              <th className="px-4 py-3">N° oferta</th>
-              <th className="px-4 py-3">SKU proveedor</th>
-              <th className="px-4 py-3">Descripción</th>
-              <th className="px-4 py-3 text-right">Desde cant.</th>
-              <th className="px-4 py-3 text-right">Descuento</th>
-              <th className="px-4 py-3 text-right">Precio unitario</th>
-              <th className="px-4 py-3">Vigencia</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <Table className="min-w-[900px]">
+          <TableHeader>
+            <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              <TableHead>Marca</TableHead>
+              <TableHead>N° oferta</TableHead>
+              <TableHead>SKU proveedor</TableHead>
+              <TableHead>Descripción</TableHead>
+              <TableHead className="text-right">Desde cant.</TableHead>
+              <TableHead className="text-right">Descuento</TableHead>
+              <TableHead className="text-right">Precio unitario</TableHead>
+              <TableHead>Vigencia</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {!loading && data && data.items.length === 0 && (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   colSpan={8}
-                  className="px-4 py-8 text-center text-zinc-500 dark:text-zinc-400"
+                  className="py-8 text-center whitespace-normal text-zinc-500 dark:text-zinc-400"
                 >
                   No se encontraron ofertas con esos filtros.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
             {data?.items.map((oferta) => {
               const isExpanded = expandedRow === oferta.id;
               return (
                 <Fragment key={oferta.id}>
-                  <tr
+                  <TableRow
                     onClick={() =>
                       setExpandedRow(isExpanded ? null : oferta.id)
                     }
-                    className="cursor-pointer border-b border-zinc-100 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
+                    className="cursor-pointer"
                   >
-                    <td className="px-4 py-2 whitespace-nowrap text-zinc-700 dark:text-zinc-300">
+                    <TableCell className="text-zinc-700 dark:text-zinc-300">
                       {oferta.marca}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-zinc-700 dark:text-zinc-300">
+                    </TableCell>
+                    <TableCell className="text-zinc-700 dark:text-zinc-300">
                       {oferta.numero_oferta}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                      {oferta.sku_proveedor}
-                    </td>
-                    <td className="px-4 py-2 text-zinc-900 dark:text-zinc-100">
-                      {oferta.descripcion}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-right text-zinc-700 dark:text-zinc-300">
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                      <HighlightText text={oferta.sku_proveedor} query={debouncedSearch} />
+                    </TableCell>
+                    <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
+                      <HighlightText text={oferta.descripcion} query={debouncedSearch} />
+                    </TableCell>
+                    <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
                       {oferta.desde_cantidad}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-right text-zinc-700 dark:text-zinc-300">
+                    </TableCell>
+                    <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
                       {oferta.descuento_pct}%
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-right text-zinc-900 dark:text-zinc-100">
+                    </TableCell>
+                    <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
                       {formatPrecio(oferta.precio_unitario)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-zinc-700 dark:text-zinc-300">
+                    </TableCell>
+                    <TableCell className="text-zinc-700 dark:text-zinc-300">
                       {oferta.fecha_oferta}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                   {isExpanded && (
-                    <tr className="border-b border-zinc-100 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950">
-                      <td colSpan={8} className="px-4 py-3">
+                    <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
+                      <TableCell colSpan={8} className="whitespace-normal py-3">
                         <p className="mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
                           Fila original ({oferta.archivo_origen}, publicada a
                           las {oferta.hora_oferta}):
@@ -209,14 +338,14 @@ export default function OfertasView() {
                         <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-zinc-800 dark:bg-black dark:text-zinc-200">
                           {JSON.stringify(oferta.raw_data, null, 2)}
                         </pre>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
                 </Fragment>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </>
   );

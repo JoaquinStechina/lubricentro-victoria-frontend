@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Tab = "catalogo" | "ofertas";
 
@@ -22,30 +23,23 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="mb-6 flex gap-2 border-b border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={() => setTab("catalogo")}
-            className={`px-4 py-2 text-sm font-medium ${
-              tab === "catalogo"
-                ? "border-b-2 border-black text-black dark:border-zinc-50 dark:text-zinc-50"
-                : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            Catálogo ({(31586).toLocaleString("es-AR")})
-          </button>
-          <button
-            onClick={() => setTab("ofertas")}
-            className={`px-4 py-2 text-sm font-medium ${
-              tab === "ofertas"
-                ? "border-b-2 border-black text-black dark:border-zinc-50 dark:text-zinc-50"
-                : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            Ofertas ({(1018).toLocaleString("es-AR")})
-          </button>
-        </div>
+        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="catalogo">
+              Catálogo ({(31586).toLocaleString("es-AR")})
+            </TabsTrigger>
+            <TabsTrigger value="ofertas">
+              Ofertas ({(1018).toLocaleString("es-AR")})
+            </TabsTrigger>
+          </TabsList>
 
-        {tab === "catalogo" ? <CatalogoView /> : <OfertasView />}
+          <TabsContent value="catalogo">
+            <CatalogoView />
+          </TabsContent>
+          <TabsContent value="ofertas">
+            <OfertasView />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
