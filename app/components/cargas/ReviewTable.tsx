@@ -1,11 +1,12 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import { applyMappingPreview } from "@/app/lib/applyMappingPreview";
 import {
   CANONICAL_FIELDS,
   CANONICAL_FIELD_LABELS,
+  type Advertencia,
   type CanonicalField,
   type CanonicalRowInput,
   type Carga,
@@ -68,6 +69,37 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Etapa 5 (ver contexto.md): chequeos determinísticos calculados por el
+  // backend como paso aparte al abrir esta pantalla, no durante
+  // procesarCarga. Se piden una sola vez al montar — si el usuario cambia el
+  // mapeo después, las advertencias no se recalculan (reflejan el mapeo
+  // sugerido con el que se abrió la revisión).
+  const [advertencias, setAdvertencias] = useState<Advertencia[]>([]);
+  useEffect(() => {
+    let active = true;
+    apiFetch<{ advertencias: Advertencia[] }>(`/api/uploads/${carga.id}/advertencias`)
+      .then((res) => {
+        if (active) setAdvertencias(res.advertencias);
+      })
+      .catch(() => {
+        // No bloquea la revisión: si falla, simplemente no se muestran
+        // advertencias para esta carga.
+      });
+    return () => {
+      active = false;
+    };
+  }, [carga.id]);
+
+  const advertenciasPorFila = useMemo(() => {
+    const mapa = new Map<number, Advertencia[]>();
+    for (const a of advertencias) {
+      const lista = mapa.get(a.fila) ?? [];
+      lista.push(a);
+      mapa.set(a.fila, lista);
+    }
+    return mapa;
+  }, [advertencias]);
 
   // Al cambiar un mapeo, recalcula la vista previa a partir de las filas
   // crudas — pero preserva cualquier celda que el usuario ya haya corregido
@@ -209,6 +241,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                 <TableHead key={field}>{CANONICAL_FIELD_LABELS[field]}</TableHead>
               ))}
               <TableHead>Datos sin mapear</TableHead>
+              <TableHead>Advertencias</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -216,9 +249,18 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
               const isExpanded = expandedRow === idx;
               const hasRawData = row.raw_data && Object.keys(row.raw_data).length > 0;
               const isExcluded = excluded.has(idx);
+              const advertenciasFila = advertenciasPorFila.get(idx) ?? [];
               return (
                 <Fragment key={idx}>
-                  <TableRow className={isExcluded ? "opacity-40" : undefined}>
+                  <TableRow
+                    className={
+                      isExcluded
+                        ? "opacity-40"
+                        : advertenciasFila.length > 0
+                          ? "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/60"
+                          : undefined
+                    }
+                  >
                     <TableCell>
                       <input
                         type="checkbox"
@@ -255,10 +297,22 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                         <span className="text-xs text-zinc-400">—</span>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {advertenciasFila.length > 0 ? (
+                        <span
+                          className="text-xs font-medium text-amber-700 dark:text-amber-400"
+                          title={advertenciasFila.map((a) => a.mensaje).join("\n")}
+                        >
+                          ⚠ {advertenciasFila.length}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-400">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                   {isExpanded && hasRawData && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
-                      <TableCell colSpan={CANONICAL_FIELDS.length + 2} className="whitespace-normal py-3">
+                      <TableCell colSpan={CANONICAL_FIELDS.length + 3} className="whitespace-normal py-3">
                         <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-zinc-800 dark:bg-black dark:text-zinc-200">
                           {JSON.stringify(row.raw_data, null, 2)}
                         </pre>

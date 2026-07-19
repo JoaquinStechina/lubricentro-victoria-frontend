@@ -95,6 +95,15 @@ export type CanonicalRowInput = Partial<Record<CanonicalField, string>> & {
   raw_data?: Record<string, unknown>;
 };
 
+// Etapa 5 (ver contexto.md): chequeos determinísticos que corre el backend
+// como paso aparte (GET /api/uploads/:id/advertencias) cuando se abre la
+// pantalla de revisión — no bloquean ni corrigen nada, son informativas.
+export type Advertencia = {
+  fila: number; // índice dentro de filasExtraidas.rows, mismo orden que las filas de la tabla
+  campo: string;
+  mensaje: string;
+};
+
 export type Proveedor = {
   id: number;
   nombre: string;

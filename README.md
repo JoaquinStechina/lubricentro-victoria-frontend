@@ -21,8 +21,12 @@ Al tipear en el buscador se filtran **todas** las columnas de la tabla (no solo 
   `data/`), esta sección habla en vivo con el backend nuevo (`../backend`, Express + Prisma).
   Subís un archivo (imagen, PDF o excel) de un proveedor, se procesa con IA, y antes de guardar
   nada se muestra una pantalla de revisión donde se puede corregir el mapeo de columnas y
-  cualquier valor extraído a mano — ninguna carga se publica sin confirmación humana. Requiere
-  el backend corriendo (`NEXT_PUBLIC_API_URL`, default `http://localhost:4000`, ver `.env.local`).
+  cualquier valor extraído a mano — ninguna carga se publica sin confirmación humana. Esa misma
+  pantalla (`ReviewTable.tsx` / `ReviewTableOfertas.tsx`) marca con ⚠ las filas con advertencias
+  (precio en cero, SKU/tramo duplicado, salto de precio anómalo, campos obligatorios faltantes en
+  ofertas — ver `../backend/README.md`) calculadas por el backend al abrir la pantalla; son solo
+  informativas, no bloquean la confirmación. Requiere el backend corriendo
+  (`NEXT_PUBLIC_API_URL`, default `http://localhost:4000`, ver `.env.local`).
 
 ## Stack
 
