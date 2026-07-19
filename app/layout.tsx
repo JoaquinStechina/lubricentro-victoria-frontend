@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { getSession } from "@/app/lib/session";
+import { SessionProvider } from "@/app/components/SessionProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,11 +19,13 @@ export const metadata: Metadata = {
   description: "Prototipo de visualización del catálogo centralizado de listas de precios",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSession();
+
   return (
     <html
       lang="en"
@@ -38,7 +42,9 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SessionProvider session={session}>{children}</SessionProvider>
+      </body>
     </html>
   );
 }

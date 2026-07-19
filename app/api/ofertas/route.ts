@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOfertas, type OfertaColumnKey } from "@/app/lib/ofertas";
+import { getSession } from "@/app/lib/session";
 
 const COLUMN_KEYS: OfertaColumnKey[] = [
   "marca",
@@ -13,6 +14,11 @@ const COLUMN_KEYS: OfertaColumnKey[] = [
 ];
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
 
   const search = searchParams.get("search") || undefined;

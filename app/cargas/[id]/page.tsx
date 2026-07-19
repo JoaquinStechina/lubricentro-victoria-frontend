@@ -8,6 +8,7 @@ import { apiFetch } from "@/app/lib/api";
 import type { Carga } from "@/app/lib/cargas";
 import ReviewTable from "@/app/components/cargas/ReviewTable";
 import ReviewTableOfertas from "@/app/components/cargas/ReviewTableOfertas";
+import UserMenu from "@/app/components/UserMenu";
 import { Button } from "@/components/ui/button";
 
 const LOADER_STAGES = [
@@ -153,12 +154,15 @@ function Wrapper({ carga, children }: { carga?: Carga; children: React.ReactNode
     <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-black">
       <main className="flex flex-1 w-full flex-col px-6 py-10 sm:px-10">
         <header className="mb-6">
-          <Link
-            href="/cargas"
-            className="mb-2 inline-block text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            ← Cargas
-          </Link>
+          <div className="mb-2 flex items-center justify-between gap-4">
+            <Link
+              href="/cargas"
+              className="inline-block text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              ← Cargas
+            </Link>
+            <UserMenu />
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             {carga?.nombreArchivo ?? "Cargando…"}
           </h1>

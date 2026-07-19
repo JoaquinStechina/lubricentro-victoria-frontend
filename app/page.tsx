@@ -5,6 +5,8 @@ import { useState } from "react";
 import { UploadCloudIcon } from "lucide-react";
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
+import UserMenu from "@/app/components/UserMenu";
+import { useSession } from "@/app/components/SessionProvider";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -12,6 +14,8 @@ type Tab = "catalogo" | "ofertas";
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("catalogo");
+  const session = useSession();
+  const puedeCargarDatos = session?.rol === "ADMINISTRADOR" || session?.rol === "SYSADMIN";
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-black">
@@ -26,12 +30,17 @@ export default function Home() {
               ya parseadas.
             </p>
           </div>
-          <Link href="/cargas">
-            <Button variant="outline">
-              <UploadCloudIcon />
-              Cargar archivo
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            {puedeCargarDatos && (
+              <Link href="/cargas">
+                <Button variant="outline">
+                  <UploadCloudIcon />
+                  Cargar archivo
+                </Button>
+              </Link>
+            )}
+            <UserMenu />
+          </div>
         </header>
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>

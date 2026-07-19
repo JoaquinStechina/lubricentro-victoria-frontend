@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeftIcon } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
+import UserMenu from "@/app/components/UserMenu";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -49,13 +50,16 @@ export default function GestionPage() {
     <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-black">
       <main className="flex flex-1 w-full flex-col px-6 py-10 sm:px-10">
         <header className="mb-6">
-          <Link
-            href="/cargas"
-            className="mb-2 inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            <ArrowLeftIcon className="size-3.5" />
-            Cargas
-          </Link>
+          <div className="mb-2 flex items-center justify-between gap-4">
+            <Link
+              href="/cargas"
+              className="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            >
+              <ArrowLeftIcon className="size-3.5" />
+              Cargas
+            </Link>
+            <UserMenu />
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             Catálogo y ofertas
           </h1>

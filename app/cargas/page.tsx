@@ -6,6 +6,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { apiFetch } from "@/app/lib/api";
 import { ESTADO_LABELS, TIPO_DATOS_LABELS, type Carga, type CargaEstado } from "@/app/lib/cargas";
 import UploadForm from "@/app/components/cargas/UploadForm";
+import UserMenu from "@/app/components/UserMenu";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -59,12 +60,15 @@ export default function CargasPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
               Cargar archivo de proveedor
             </h1>
-            <Link
-              href="/cargas/gestion"
-              className="text-sm text-primary hover:underline whitespace-nowrap"
-            >
-              Ver catálogo y ofertas
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/cargas/gestion"
+                className="text-sm text-primary hover:underline whitespace-nowrap"
+              >
+                Ver catálogo y ofertas
+              </Link>
+              <UserMenu />
+            </div>
           </div>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Subí una lista de precios (imagen, PDF o excel). Después de procesarla vas a poder
