@@ -27,6 +27,10 @@ Al tipear en el buscador se filtran **todas** las columnas de la tabla (no solo 
   ofertas — ver `../backend/README.md`) calculadas por el backend al abrir la pantalla; son solo
   informativas, no bloquean la confirmación. Requiere el backend corriendo
   (`NEXT_PUBLIC_API_URL`, default `http://localhost:4000`, ver `.env.local`).
+- **Catálogo y ofertas vigentes** (`/cargas/gestion`): pantalla mínima, también contra el backend
+  real, para ver el precio actual por SKU (`ProductoPrecio.vigente`) y las ofertas activas, y
+  cerrar/reactivar una oferta ("marcar agotada") cuando se acaba el stock — ver `../contexto.md`,
+  sección "Vigencia de catálogo y ofertas".
 
 ## Stack
 

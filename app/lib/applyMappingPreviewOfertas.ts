@@ -9,8 +9,8 @@ import type {
 // Paralelo a applyMappingPreview.ts (mismo criterio: solo texto, sin parseo
 // tolerante — eso lo hace normalizeOfertaRow del lado del servidor al
 // confirmar), pero además completa marca/numero_oferta/fecha_oferta/
-// hora_oferta con la metadata "de todo el archivo" cuando el campo no vino
-// de una columna mapeada. Mantener sincronizado con
+// hora_oferta/fecha_hasta con la metadata "de todo el archivo" cuando el
+// campo no vino de una columna mapeada. Mantener sincronizado con
 // backend/src/extraction/mappingOfertas.ts#applyMappingOfertas.
 function toDisplayString(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -43,6 +43,7 @@ export function applyMappingPreviewOfertas(
     }
     if (!canonical.fecha_oferta && metadata.fecha_oferta) canonical.fecha_oferta = metadata.fecha_oferta;
     if (!canonical.hora_oferta && metadata.hora_oferta) canonical.hora_oferta = metadata.hora_oferta;
+    if (!canonical.fecha_hasta && metadata.fecha_hasta) canonical.fecha_hasta = metadata.fecha_hasta;
     if (!canonical.moneda) canonical.moneda = "ARS";
 
     return { ...canonical, raw_data: rawData };

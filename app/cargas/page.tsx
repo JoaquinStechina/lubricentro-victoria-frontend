@@ -55,9 +55,17 @@ export default function CargasPage() {
             <ArrowLeftIcon className="size-3.5" />
             Catálogo
           </Link>
-          <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Cargar archivo de proveedor
-          </h1>
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
+              Cargar archivo de proveedor
+            </h1>
+            <Link
+              href="/cargas/gestion"
+              className="text-sm text-primary hover:underline whitespace-nowrap"
+            >
+              Ver catálogo y ofertas
+            </Link>
+          </div>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Subí una lista de precios (imagen, PDF o excel). Después de procesarla vas a poder
             revisar y corregir los datos antes de que se guarden.

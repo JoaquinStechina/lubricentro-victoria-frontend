@@ -47,6 +47,7 @@ export const CANONICAL_FIELDS_OFERTAS = [
   "moneda",
   "fecha_oferta",
   "hora_oferta",
+  "fecha_hasta",
 ] as const;
 
 export type OfertaField = (typeof CANONICAL_FIELDS_OFERTAS)[number];
@@ -62,6 +63,7 @@ export const OFERTA_FIELD_LABELS: Record<OfertaField, string> = {
   moneda: "Moneda",
   fecha_oferta: "Fecha oferta",
   hora_oferta: "Hora oferta",
+  fecha_hasta: "Válida hasta",
 };
 
 export type OfertaColumnMapping = Record<string, OfertaField>;
@@ -78,6 +80,10 @@ export type OfertaMetadata = {
   numero_oferta?: string | null;
   fecha_oferta?: string | null;
   hora_oferta?: string | null;
+  // Vencimiento de la oferta (YYYY-MM-DD). Vacío/null = sin fecha fija
+  // ("hasta agotar stock") — se cierra manualmente desde /cargas/gestion,
+  // no expira sola.
+  fecha_hasta?: string | null;
 };
 
 // Fila cruda tal como la extrajo excel.ts/vision.ts: claves = headers

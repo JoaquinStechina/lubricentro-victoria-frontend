@@ -41,14 +41,15 @@ const MAPPING_SELECT_ITEMS: Record<string, string> = {
   ...OFERTA_FIELD_LABELS,
 };
 
-// Los 4 campos "de todo el archivo" (ver docs/plan-ofertas.md, punto 2):
+// Los campos "de todo el archivo" (ver docs/plan-ofertas.md, punto 2):
 // auto-detectados por IA en metadataOferta, editables una sola vez acá
 // arriba en vez de por fila.
-const METADATA_FIELDS: { key: keyof OfertaMetadata; label: string }[] = [
+const METADATA_FIELDS: { key: keyof OfertaMetadata; label: string; placeholder?: string }[] = [
   { key: "marca", label: "Marca" },
   { key: "numero_oferta", label: "N° oferta" },
   { key: "fecha_oferta", label: "Fecha oferta" },
   { key: "hora_oferta", label: "Hora oferta" },
+  { key: "fecha_hasta", label: "Válida hasta", placeholder: "vacío = hasta agotar stock" },
 ];
 
 type ReviewTableOfertasProps = {
@@ -194,14 +195,14 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
           Datos del archivo (aplican a toda la oferta)
         </h2>
         <div className="flex flex-wrap gap-3">
-          {METADATA_FIELDS.map(({ key, label }) => (
+          {METADATA_FIELDS.map(({ key, label, placeholder }) => (
             <div key={key} className="flex flex-col gap-1">
               <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
               <Input
                 value={metadata[key] ?? ""}
                 onChange={(e) => handleMetadataChange(key, e.target.value)}
                 className="h-8 w-40 text-sm"
-                placeholder="—"
+                placeholder={placeholder ?? "—"}
               />
             </div>
           ))}
