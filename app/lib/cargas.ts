@@ -33,6 +33,53 @@ export const CANONICAL_FIELD_LABELS: Record<CanonicalField, string> = {
   fecha_vigencia: "Vigencia",
 };
 
+// Schema canónico de ofertas (descuentos por SKU con tramos de cantidad) —
+// ver backend/src/extraction/typesOfertas.ts y docs/plan-ofertas.md. Copia
+// deliberada, paralela a CANONICAL_FIELDS, no una variante genérica.
+export const CANONICAL_FIELDS_OFERTAS = [
+  "marca",
+  "numero_oferta",
+  "sku_proveedor",
+  "descripcion",
+  "desde_cantidad",
+  "descuento_pct",
+  "precio_unitario",
+  "moneda",
+  "fecha_oferta",
+  "hora_oferta",
+] as const;
+
+export type OfertaField = (typeof CANONICAL_FIELDS_OFERTAS)[number];
+
+export const OFERTA_FIELD_LABELS: Record<OfertaField, string> = {
+  marca: "Marca",
+  numero_oferta: "N° oferta",
+  sku_proveedor: "SKU proveedor",
+  descripcion: "Descripción",
+  desde_cantidad: "Desde cantidad",
+  descuento_pct: "Descuento %",
+  precio_unitario: "Precio unitario",
+  moneda: "Moneda",
+  fecha_oferta: "Fecha oferta",
+  hora_oferta: "Hora oferta",
+};
+
+export type OfertaColumnMapping = Record<string, OfertaField>;
+
+export type OfertaRowInput = Partial<Record<OfertaField, string>> & {
+  raw_data?: Record<string, unknown>;
+};
+
+// Marca/n° de oferta/fecha/hora "de todo el archivo", auto-detectados por
+// IA y editables una sola vez para toda la carga (ver docs/plan-ofertas.md,
+// punto 2). Los 4 campos son independientes de las columnas de la tabla.
+export type OfertaMetadata = {
+  marca?: string | null;
+  numero_oferta?: string | null;
+  fecha_oferta?: string | null;
+  hora_oferta?: string | null;
+};
+
 // Fila cruda tal como la extrajo excel.ts/vision.ts: claves = headers
 // originales del archivo del proveedor, valores sin normalizar.
 export type ExtractedRow = Record<string, unknown>;
@@ -63,6 +110,13 @@ export type CargaEstado =
 
 export type TipoArchivo = "xlsx" | "xls" | "pdf" | "png" | "jpg" | "jpeg";
 
+export type TipoDatos = "catalogo" | "oferta";
+
+export const TIPO_DATOS_LABELS: Record<TipoDatos, string> = {
+  catalogo: "Catálogo",
+  oferta: "Oferta",
+};
+
 export type Carga = {
   id: number;
   proveedorId: number | null;
@@ -70,10 +124,12 @@ export type Carga = {
   nombreArchivo: string;
   rutaArchivo: string;
   tipoArchivo: TipoArchivo;
+  tipoDatos: TipoDatos;
   estado: CargaEstado;
   mensajeError: string | null;
   filasExtraidas: { headers: string[]; rows: ExtractedRow[] } | null;
-  mapeoSugerido: ColumnMapping | null;
+  mapeoSugerido: ColumnMapping | OfertaColumnMapping | null;
+  metadataOferta: OfertaMetadata | null;
   createdAt: string;
   updatedAt: string;
 };

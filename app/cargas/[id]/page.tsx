@@ -7,6 +7,7 @@ import { CheckCircle2Icon, Loader2Icon, XCircleIcon } from "lucide-react";
 import { apiFetch } from "@/app/lib/api";
 import type { Carga } from "@/app/lib/cargas";
 import ReviewTable from "@/app/components/cargas/ReviewTable";
+import ReviewTableOfertas from "@/app/components/cargas/ReviewTableOfertas";
 import { Button } from "@/components/ui/button";
 
 const LOADER_STAGES = [
@@ -111,7 +112,11 @@ export default function CargaWizardPage() {
               ? "Proveedor nuevo (o le cambiaron las columnas): revisá el mapeo sugerido por la IA y los valores antes de confirmar."
               : "Este proveedor ya tiene un mapeo aprobado — revisá los valores extraídos y confirmá para guardarlos."}
           </p>
-          <ReviewTable carga={carga} onConfirmed={setCarga} />
+          {carga.tipoDatos === "oferta" ? (
+            <ReviewTableOfertas carga={carga} onConfirmed={setCarga} />
+          ) : (
+            <ReviewTable carga={carga} onConfirmed={setCarga} />
+          )}
         </>
       )}
 

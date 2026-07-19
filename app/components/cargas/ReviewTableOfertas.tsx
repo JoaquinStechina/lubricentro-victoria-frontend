@@ -2,14 +2,15 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
-import { applyMappingPreview } from "@/app/lib/applyMappingPreview";
+import { applyMappingPreviewOfertas } from "@/app/lib/applyMappingPreviewOfertas";
 import {
-  CANONICAL_FIELDS,
-  CANONICAL_FIELD_LABELS,
-  type CanonicalField,
-  type CanonicalRowInput,
+  CANONICAL_FIELDS_OFERTAS,
+  OFERTA_FIELD_LABELS,
+  type OfertaField,
+  type OfertaRowInput,
   type Carga,
-  type ColumnMapping,
+  type OfertaColumnMapping,
+  type OfertaMetadata,
 } from "@/app/lib/cargas";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,27 +35,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 const NONE_VALUE = "__none__";
 const PAGE_SIZE = 50;
 
-// Le da a <Select items={...}> el mapeo valor -> etiqueta para que
-// <SelectValue> muestre la etiqueta en español apenas se elige una opción,
-// sin depender de que el popup ya se haya abierto/montado una vez (Base UI
-// resuelve la label contra este mapeo, no contra el DOM de SelectContent).
 const MAPPING_SELECT_ITEMS: Record<string, string> = {
   [NONE_VALUE]: "No mapear",
-  ...CANONICAL_FIELD_LABELS,
+  ...OFERTA_FIELD_LABELS,
 };
 
-type ReviewTableProps = {
+// Los 4 campos "de todo el archivo" (ver docs/plan-ofertas.md, punto 2):
+// auto-detectados por IA en metadataOferta, editables una sola vez acá
+// arriba en vez de por fila.
+const METADATA_FIELDS: { key: keyof OfertaMetadata; label: string }[] = [
+  { key: "marca", label: "Marca" },
+  { key: "numero_oferta", label: "N° oferta" },
+  { key: "fecha_oferta", label: "Fecha oferta" },
+  { key: "hora_oferta", label: "Hora oferta" },
+];
+
+type ReviewTableOfertasProps = {
   carga: Carga;
   onConfirmed: (carga: Carga) => void;
 };
 
-export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
+// Paralela a ReviewTable.tsx (mismo criterio de "funciones/componentes
+// paralelos" del plan de ofertas: el shape de los datos y el paso extra de
+// metadata de archivo no calzan bien en una sola tabla genérica).
+export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOfertasProps) {
   const { headers, rows: rawRows } = carga.filasExtraidas ?? { headers: [], rows: [] };
-  const mapeoSugerido = (carga.mapeoSugerido as ColumnMapping | null) ?? {};
 
-  const [mapping, setMapping] = useState<ColumnMapping>(mapeoSugerido);
-  const [rows, setRows] = useState<CanonicalRowInput[]>(() =>
-    applyMappingPreview(headers, rawRows, mapeoSugerido)
+  const [metadata, setMetadata] = useState<OfertaMetadata>(carga.metadataOferta ?? {});
+  const [mapping, setMapping] = useState<OfertaColumnMapping>(
+    (carga.mapeoSugerido as OfertaColumnMapping | null) ?? {}
+  );
+  const [rows, setRows] = useState<OfertaRowInput[]>(() =>
+    applyMappingPreviewOfertas(headers, rawRows, mapping, metadata)
   );
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const [dirty, setDirty] = useState<Set<string>>(new Set());
@@ -69,17 +81,17 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Al cambiar un mapeo, recalcula la vista previa a partir de las filas
-  // crudas — pero preserva cualquier celda que el usuario ya haya corregido
-  // a mano (dirtyRef), en vez de pisarla con el nuevo valor derivado.
+  // Al cambiar el mapeo o la metadata de archivo, recalcula la vista previa
+  // — pero preserva cualquier celda que el usuario ya haya corregido a mano
+  // (dirtyRef), igual que ReviewTable.tsx.
   useEffect(() => {
-    const preview = applyMappingPreview(headers, rawRows, mapping);
+    const preview = applyMappingPreviewOfertas(headers, rawRows, mapping, metadata);
     setRows((prev) =>
       preview.map((newRow, idx) => {
         const prevRow = prev[idx];
         if (!prevRow) return newRow;
-        const merged: CanonicalRowInput = { ...newRow };
-        for (const field of CANONICAL_FIELDS) {
+        const merged: OfertaRowInput = { ...newRow };
+        for (const field of CANONICAL_FIELDS_OFERTAS) {
           if (dirtyRef.current.has(`${idx}:${field}`)) {
             merged[field] = prevRow[field];
           }
@@ -88,18 +100,22 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
       })
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapping]);
+  }, [mapping, metadata]);
 
   function handleMappingChange(header: string, value: string) {
     setMapping((prev) => {
       const next = { ...prev };
       if (value === NONE_VALUE) delete next[header];
-      else next[header] = value as CanonicalField;
+      else next[header] = value as OfertaField;
       return next;
     });
   }
 
-  function handleCellChange(rowIdx: number, field: CanonicalField, value: string) {
+  function handleMetadataChange(key: keyof OfertaMetadata, value: string) {
+    setMetadata((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleCellChange(rowIdx: number, field: OfertaField, value: string) {
     setRows((prev) => {
       const next = [...prev];
       next[rowIdx] = { ...next[rowIdx], [field]: value };
@@ -145,6 +161,30 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
     <div className="flex flex-col gap-4">
       <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          Datos del archivo (aplican a toda la oferta)
+        </h2>
+        <div className="flex flex-wrap gap-3">
+          {METADATA_FIELDS.map(({ key, label }) => (
+            <div key={key} className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
+              <Input
+                value={metadata[key] ?? ""}
+                onChange={(e) => handleMetadataChange(key, e.target.value)}
+                className="h-8 w-40 text-sm"
+                placeholder="—"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+          Sugeridos por IA a partir del nombre de archivo y el encabezado — corregí lo que haga
+          falta antes de confirmar. Solo se usan para las filas donde el dato no viene de una
+          columna mapeada.
+        </p>
+      </section>
+
+      <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
           Mapeo de columnas
         </h2>
         <div className="flex flex-wrap gap-3">
@@ -163,9 +203,9 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE_VALUE}>No mapear</SelectItem>
-                  {CANONICAL_FIELDS.map((field) => (
+                  {CANONICAL_FIELDS_OFERTAS.map((field) => (
                     <SelectItem key={field} value={field}>
-                      {CANONICAL_FIELD_LABELS[field]}
+                      {OFERTA_FIELD_LABELS[field]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -205,8 +245,8 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           <TableHeader>
             <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               <TableHead>Incluir</TableHead>
-              {CANONICAL_FIELDS.map((field) => (
-                <TableHead key={field}>{CANONICAL_FIELD_LABELS[field]}</TableHead>
+              {CANONICAL_FIELDS_OFERTAS.map((field) => (
+                <TableHead key={field}>{OFERTA_FIELD_LABELS[field]}</TableHead>
               ))}
               <TableHead>Datos sin mapear</TableHead>
             </TableRow>
@@ -227,7 +267,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                         aria-label={isExcluded ? "Incluir fila" : "Excluir fila"}
                       />
                     </TableCell>
-                    {CANONICAL_FIELDS.map((field) => (
+                    {CANONICAL_FIELDS_OFERTAS.map((field) => (
                       <TableCell key={field}>
                         <Input
                           value={row[field] ?? ""}
@@ -235,7 +275,10 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                           disabled={isExcluded}
                           className="h-7 w-32 text-xs"
                           inputMode={
-                            field === "precio_neto" || field === "precio_con_iva" || field === "alicuota_iva"
+                            field === "precio_unitario" ||
+                            field === "descuento_pct" ||
+                            field === "desde_cantidad" ||
+                            field === "numero_oferta"
                               ? "decimal"
                               : "text"
                           }
@@ -258,7 +301,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                   </TableRow>
                   {isExpanded && hasRawData && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
-                      <TableCell colSpan={CANONICAL_FIELDS.length + 2} className="whitespace-normal py-3">
+                      <TableCell colSpan={CANONICAL_FIELDS_OFERTAS.length + 2} className="whitespace-normal py-3">
                         <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-zinc-800 dark:bg-black dark:text-zinc-200">
                           {JSON.stringify(row.raw_data, null, 2)}
                         </pre>
@@ -279,10 +322,10 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           <DialogTrigger render={<Button size="lg" />}>Confirmar carga</DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>¿Confirmar carga de {incluidas.toLocaleString("es-AR")} productos?</DialogTitle>
+              <DialogTitle>¿Confirmar carga de {incluidas.toLocaleString("es-AR")} ofertas?</DialogTitle>
               <DialogDescription>
                 {excluded.size > 0 && `${excluded.size} fila(s) excluida(s) no se van a guardar. `}
-                Esta acción escribe los productos en la base de datos.
+                Esta acción escribe las ofertas en la base de datos.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

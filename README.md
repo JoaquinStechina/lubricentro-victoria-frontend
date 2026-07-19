@@ -17,6 +17,12 @@ Al tipear en el buscador se filtran **todas** las columnas de la tabla (no solo 
 - Las coincidencias se **resaltan** en cualquier columna donde aparezcan.
 - Filas con datos del proveedor que no entran en el schema canónico se pueden expandir para ver el `raw_data` original.
 - Tema claro/oscuro automático según preferencia del sistema operativo.
+- **Cargar archivo** (`/cargas`): a diferencia de todo lo anterior (que lee los JSON estáticos de
+  `data/`), esta sección habla en vivo con el backend nuevo (`../backend`, Express + Prisma).
+  Subís un archivo (imagen, PDF o excel) de un proveedor, se procesa con IA, y antes de guardar
+  nada se muestra una pantalla de revisión donde se puede corregir el mapeo de columnas y
+  cualquier valor extraído a mano — ninguna carga se publica sin confirmación humana. Requiere
+  el backend corriendo (`NEXT_PUBLIC_API_URL`, default `http://localhost:4000`, ver `.env.local`).
 
 ## Stack
 
@@ -35,4 +41,4 @@ Abrí [http://localhost:3000](http://localhost:3000).
 
 ## Datos
 
-Los datos parseados viven en `data/productos_todos.json` y `data/ofertas.json`, leídos por `app/lib/productos.ts` y `app/lib/ofertas.ts` y expuestos vía `app/api/productos` y `app/api/ofertas`.
+Los datos parseados viven en `data/productos_todos.json` y `data/ofertas.json`, leídos por `app/lib/productos.ts` y `app/lib/ofertas.ts` y expuestos vía `app/api/productos` y `app/api/ofertas`. Esto es aparte y no se actualiza con lo que se confirma en `/cargas` — ver `../contexto.md` para el detalle de esta desprolijidad conocida.

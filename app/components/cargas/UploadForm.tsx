@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckIcon, ChevronsUpDownIcon, PlusIcon, UploadCloudIcon } from "lucide-react";
 import { API_URL, apiFetch } from "@/app/lib/api";
-import { ACCEPTED_EXTENSIONS, type Carga, type Proveedor } from "@/app/lib/cargas";
+import {
+  ACCEPTED_EXTENSIONS,
+  TIPO_DATOS_LABELS,
+  type Carga,
+  type Proveedor,
+  type TipoDatos,
+} from "@/app/lib/cargas";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +27,7 @@ type UploadFormProps = {
 };
 
 export default function UploadForm({ onUploaded }: UploadFormProps) {
+  const [tipoDatos, setTipoDatos] = useState<TipoDatos>("catalogo");
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [proveedorNombre, setProveedorNombre] = useState("");
   const [proveedorOpen, setProveedorOpen] = useState(false);
@@ -77,6 +84,7 @@ export default function UploadForm({ onUploaded }: UploadFormProps) {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("tipoDatos", tipoDatos);
       if (proveedorNombre.trim()) formData.append("proveedor", proveedorNombre.trim());
 
       const res = await fetch(`${API_URL}/api/uploads`, { method: "POST", body: formData });
@@ -95,6 +103,27 @@ export default function UploadForm({ onUploaded }: UploadFormProps) {
 
   return (
     <section className="mb-6 flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex flex-col gap-1 text-sm">
+        <span className="text-zinc-600 dark:text-zinc-400">Tipo de archivo</span>
+        <div className="inline-flex w-fit rounded-md border border-zinc-200 p-0.5 dark:border-zinc-800">
+          {(Object.keys(TIPO_DATOS_LABELS) as TipoDatos[]).map((opcion) => (
+            <button
+              key={opcion}
+              type="button"
+              onClick={() => setTipoDatos(opcion)}
+              className={cn(
+                "rounded px-3 py-1 text-sm transition-colors",
+                tipoDatos === opcion
+                  ? "bg-primary text-primary-foreground"
+                  : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              )}
+            >
+              {TIPO_DATOS_LABELS[opcion]}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex flex-col gap-1 text-sm">
         <span className="text-zinc-600 dark:text-zinc-400">Proveedor</span>
         <Popover open={proveedorOpen} onOpenChange={setProveedorOpen}>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeftIcon } from "lucide-react";
 import { apiFetch } from "@/app/lib/api";
-import { ESTADO_LABELS, type Carga, type CargaEstado } from "@/app/lib/cargas";
+import { ESTADO_LABELS, TIPO_DATOS_LABELS, type Carga, type CargaEstado } from "@/app/lib/cargas";
 import UploadForm from "@/app/components/cargas/UploadForm";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -76,7 +76,8 @@ export default function CargasPage() {
               <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 <TableHead>Archivo</TableHead>
                 <TableHead>Proveedor</TableHead>
-                <TableHead>Tipo</TableHead>
+                <TableHead>Formato</TableHead>
+                <TableHead>Datos</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead />
@@ -85,14 +86,14 @@ export default function CargasPage() {
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <TableCell colSpan={7} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
                     Cargando…
                   </TableCell>
                 </TableRow>
               )}
               {!loading && cargas?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
+                  <TableCell colSpan={7} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
                     Todavía no se subió ningún archivo.
                   </TableCell>
                 </TableRow>
@@ -107,6 +108,11 @@ export default function CargasPage() {
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300 uppercase">
                     {carga.tipoArchivo}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={carga.tipoDatos === "oferta" ? "default" : "secondary"}>
+                      {TIPO_DATOS_LABELS[carga.tipoDatos]}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={BADGE_VARIANT[carga.estado]}>{ESTADO_LABELS[carga.estado]}</Badge>
