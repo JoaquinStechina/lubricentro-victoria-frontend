@@ -1,33 +1,28 @@
-import fs from "node:fs";
-import path from "node:path";
-import { normalizeText } from "@/app/lib/text";
-
+// Tipo que devuelve el backend real (Express/Prisma, repo hermano `backend/`)
+// en GET /api/ofertas — ver backend/src/routes/ofertas.ts. Reemplaza al
+// prototipo anterior que leía data/ofertas.json en memoria.
 export type Oferta = {
   id: number;
-  proveedor: string;
+  proveedorId: number;
+  proveedor: { id: number; nombre: string } | null;
   marca: string;
-  numero_oferta: number;
-  sku_proveedor: string;
+  numeroOferta: number;
+  skuProveedor: string;
   descripcion: string;
-  desde_cantidad: number;
-  descuento_pct: number;
-  precio_unitario: number;
+  desdeCantidad: number;
+  descuentoPct: number;
+  precioUnitario: number;
   moneda: string;
-  fecha_oferta: string;
-  hora_oferta: string;
-  archivo_origen: string;
-  raw_data: Record<string, unknown>;
+  fechaOferta: string;
+  horaOferta: string;
+  fechaHasta: string | null;
+  activa: boolean;
+  eliminado: boolean;
+  archivoOrigen: string;
+  rawData: Record<string, unknown> | null;
+  cargaId: number | null;
+  createdAt: string;
 };
-
-let cache: Oferta[] | null = null;
-
-function loadOfertas(): Oferta[] {
-  if (cache) return cache;
-  const filePath = path.join(process.cwd(), "data", "ofertas.json");
-  const raw = fs.readFileSync(filePath, "utf-8");
-  cache = JSON.parse(raw) as Oferta[];
-  return cache;
-}
 
 export type OfertaColumnKey =
   | "marca"
@@ -39,84 +34,53 @@ export type OfertaColumnKey =
   | "precioUnitario"
   | "fechaOferta";
 
-function getColumnValue(o: Oferta, key: OfertaColumnKey): string {
-  switch (key) {
-    case "marca":
-      return o.marca ?? "";
-    case "numeroOferta":
-      return String(o.numero_oferta);
-    case "sku":
-      return o.sku_proveedor ?? "";
-    case "descripcion":
-      return o.descripcion ?? "";
-    case "desdeCantidad":
-      return String(o.desde_cantidad);
-    case "descuento":
-      return String(o.descuento_pct);
-    case "precioUnitario":
-      return String(o.precio_unitario);
-    case "fechaOferta":
-      return o.fecha_oferta ?? "";
-  }
-}
+// Campos que puede tocar PATCH /api/ofertas/:id (edición de una fila). No
+// incluye `activa`: eso solo lo tocan POST /cerrar y /reactivar.
+export const OFERTA_SINGLE_EDIT_FIELDS = [
+  "marca",
+  "numeroOferta",
+  "skuProveedor",
+  "descripcion",
+  "desdeCantidad",
+  "descuentoPct",
+  "precioUnitario",
+  "moneda",
+  "fechaOferta",
+  "horaOferta",
+  "fechaHasta",
+] as const;
+export type OfertaSingleEditField = (typeof OFERTA_SINGLE_EDIT_FIELDS)[number];
 
-export type QueryOfertasParams = {
-  search?: string;
-  columnFilters?: Partial<Record<OfertaColumnKey, string>>;
-  page: number;
-  pageSize: number;
+// Campos que puede tocar POST /api/ofertas/editar-lote (subset más chico:
+// excluye identificadores como marca/numeroOferta/skuProveedor/descripcion).
+export const OFERTA_BULK_EDIT_FIELDS = [
+  "desdeCantidad",
+  "descuentoPct",
+  "precioUnitario",
+  "moneda",
+  "fechaOferta",
+  "horaOferta",
+  "fechaHasta",
+] as const;
+export type OfertaBulkEditField = (typeof OFERTA_BULK_EDIT_FIELDS)[number];
+
+export const OFERTA_FIELD_LABELS: Record<OfertaSingleEditField, string> = {
+  marca: "Marca",
+  numeroOferta: "N° oferta",
+  skuProveedor: "SKU proveedor",
+  descripcion: "Descripción",
+  desdeCantidad: "Desde cantidad",
+  descuentoPct: "Descuento %",
+  precioUnitario: "Precio unitario",
+  moneda: "Moneda",
+  fechaOferta: "Fecha oferta",
+  horaOferta: "Hora oferta",
+  fechaHasta: "Vigente hasta",
 };
 
-export type QueryOfertasResult = {
-  items: Oferta[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-};
-
-export function queryOfertas({
-  search,
-  columnFilters,
-  page,
-  pageSize,
-}: QueryOfertasParams): QueryOfertasResult {
-  const ofertas = loadOfertas();
-  const term = search?.trim() ? normalizeText(search.trim()) : undefined;
-  const activeColumnFilters = Object.entries(columnFilters ?? {})
-    .filter((entry): entry is [OfertaColumnKey, string] => Boolean(entry[1]?.trim()))
-    .map(([key, value]) => [key, normalizeText(value.trim())] as const);
-
-  const filtered = ofertas.filter((o) => {
-    for (const [key, needle] of activeColumnFilters) {
-      if (!normalizeText(getColumnValue(o, key)).includes(needle)) return false;
-    }
-    if (term) {
-      const haystack = [
-        o.proveedor,
-        o.marca,
-        o.numero_oferta,
-        o.sku_proveedor,
-        o.descripcion,
-        o.desde_cantidad,
-        o.descuento_pct,
-        o.precio_unitario,
-        o.moneda,
-        o.fecha_oferta,
-        o.hora_oferta,
-      ]
-        .filter((v) => v !== null && v !== undefined)
-        .join(" ");
-      if (!normalizeText(haystack).includes(term)) return false;
-    }
-    return true;
-  });
-
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const start = (safePage - 1) * pageSize;
-  const items = filtered.slice(start, start + pageSize);
-
-  return { items, total, page: safePage, pageSize, totalPages };
-}
+export const OFERTA_NUMERIC_FIELDS = new Set<string>([
+  "numeroOferta",
+  "desdeCantidad",
+  "descuentoPct",
+  "precioUnitario",
+]);

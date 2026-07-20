@@ -1,26 +1,29 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
+import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import HighlightText from "@/app/components/HighlightText";
+import EditarOfertaDialog from "@/app/components/ofertas/EditarOfertaDialog";
+import BulkEditarOfertaDialog from "@/app/components/ofertas/BulkEditarOfertaDialog";
+import EliminarOfertasDialog from "@/app/components/ofertas/EliminarOfertasDialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
   TableCell,
+  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 
 type ApiResponse = {
-  items: Oferta[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  ofertas: Oferta[];
 };
 
 const PAGE_SIZE = 50;
@@ -45,13 +48,24 @@ function formatPrecio(valor: number) {
   return currencyFormatter.format(valor);
 }
 
+// El backend de ofertas no pagina (devuelve la lista completa filtrada por
+// activa/eliminado); la paginación de 50 en 50 se hace acá en memoria, igual
+// que hacía el prototipo JSON antes de migrar a la API real.
 export default function OfertasView() {
+  const session = useSession();
+  const puedeEditar = session?.rol === "ADMINISTRADOR" || session?.rol === "SYSADMIN";
+
   const [search, setSearch] = useState("");
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [page, setPage] = useState(1);
-  const [data, setData] = useState<ApiResponse | null>(null);
+  const [allOfertas, setAllOfertas] = useState<Oferta[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [debouncedColumnFilters, setDebouncedColumnFilters] = useState(
@@ -83,17 +97,15 @@ export default function OfertasView() {
     for (const [key, value] of Object.entries(debouncedColumnFilters)) {
       if (value) params.set(`f_${key}`, value);
     }
-    params.set("page", String(page));
-    params.set("pageSize", String(PAGE_SIZE));
 
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/ofertas?${params.toString()}`);
-        const json: ApiResponse = await res.json();
+        const json = await apiFetch<ApiResponse>(`/api/ofertas?${params.toString()}`);
         if (active) {
-          setData(json);
+          setAllOfertas(json.ofertas);
           setExpandedRow(null);
+          setSelectedIds(new Set());
         }
       } finally {
         if (active) setLoading(false);
@@ -104,7 +116,7 @@ export default function OfertasView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, page]);
+  }, [debouncedSearch, debouncedColumnFilters, reloadTick]);
 
   const hayFiltrosActivos =
     search || Object.values(columnFilters).some((v) => v);
@@ -114,12 +126,56 @@ export default function OfertasView() {
     setColumnFilters(EMPTY_COLUMN_FILTERS);
   }
 
+  const total = allOfertas?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageItems = useMemo(
+    () => (allOfertas ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [allOfertas, page]
+  );
+
   const rangoResultados = useMemo(() => {
-    if (!data || data.total === 0) return "0 resultados";
-    const start = (data.page - 1) * data.pageSize + 1;
-    const end = Math.min(data.page * data.pageSize, data.total);
-    return `${start}–${end} de ${data.total.toLocaleString("es-AR")}`;
-  }, [data]);
+    if (total === 0) return "0 resultados";
+    const start = (page - 1) * PAGE_SIZE + 1;
+    const end = Math.min(page * PAGE_SIZE, total);
+    return `${start}–${end} de ${total.toLocaleString("es-AR")}`;
+  }, [total, page]);
+
+  const visibleIds = pageItems.map((o) => o.id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someSelected = !allSelected && visibleIds.some((id) => selectedIds.has(id));
+
+  function toggleAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(visibleIds));
+  }
+  function toggleRow(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedOferta =
+    selectedIds.size === 1 ? (allOfertas?.find((o) => selectedIds.has(o.id)) ?? null) : null;
+
+  function handleSingleUpdated(actualizada: Oferta) {
+    setAllOfertas((prev) =>
+      prev ? prev.map((o) => (o.id === actualizada.id ? actualizada : o)) : prev
+    );
+    setSelectedIds(new Set());
+  }
+  function handleBulkUpdated() {
+    setSelectedIds(new Set());
+    setReloadTick((t) => t + 1);
+  }
+  function handleDeleted(ids: number[]) {
+    const eliminadas = new Set(ids);
+    setAllOfertas((prev) => (prev ? prev.filter((o) => !eliminadas.has(o.id)) : prev));
+    setSelectedIds(new Set());
+  }
+
+  const colSpan = puedeEditar ? 9 : 8;
 
   return (
     <>
@@ -148,24 +204,24 @@ export default function OfertasView() {
 
       <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
         <span>{loading ? "Cargando…" : rangoResultados}</span>
-        {data && data.totalPages > 1 && (
+        {totalPages > 1 && (
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={data.page <= 1}
+              disabled={page <= 1}
             >
               Anterior
             </Button>
             <span>
-              Página {data.page} de {data.totalPages}
+              Página {page} de {totalPages}
             </span>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-              disabled={data.page >= data.totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
             >
               Siguiente
             </Button>
@@ -173,10 +229,34 @@ export default function OfertasView() {
         )}
       </div>
 
+      {puedeEditar && selectedIds.size > 0 && (
+        <div className="mb-2 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
+          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            Editar
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+            Eliminar
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              {puedeEditar && (
+                <TableHead>
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={someSelected}
+                    onCheckedChange={toggleAll}
+                    aria-label="Seleccionar todo"
+                  />
+                </TableHead>
+              )}
               <ColumnFilterHeader
                 label="Marca"
                 value={columnFilters.marca}
@@ -223,17 +303,17 @@ export default function OfertasView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {!loading && data && data.items.length === 0 && (
+            {!loading && pageItems.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={colSpan}
                   className="py-8 text-center whitespace-normal text-zinc-500 dark:text-zinc-400"
                 >
                   No se encontraron ofertas con esos filtros.
                 </TableCell>
               </TableRow>
             )}
-            {data?.items.map((oferta) => {
+            {pageItems.map((oferta) => {
               const isExpanded = expandedRow === oferta.id;
               return (
                 <Fragment key={oferta.id}>
@@ -243,40 +323,49 @@ export default function OfertasView() {
                     }
                     className="cursor-pointer"
                   >
+                    {puedeEditar && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(oferta.id)}
+                          onCheckedChange={() => toggleRow(oferta.id)}
+                          aria-label="Seleccionar fila"
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <HighlightText text={oferta.marca} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={String(oferta.numero_oferta)} query={debouncedSearch} />
+                      <HighlightText text={String(oferta.numeroOferta)} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={oferta.sku_proveedor} query={debouncedSearch} />
+                      <HighlightText text={oferta.skuProveedor} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
                       <HighlightText text={oferta.descripcion} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={String(oferta.desde_cantidad)} query={debouncedSearch} />
+                      <HighlightText text={String(oferta.desdeCantidad)} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={`${oferta.descuento_pct}%`} query={debouncedSearch} />
+                      <HighlightText text={`${oferta.descuentoPct}%`} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
-                      <HighlightText text={formatPrecio(oferta.precio_unitario)} query={debouncedSearch} />
+                      <HighlightText text={formatPrecio(oferta.precioUnitario)} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={oferta.fecha_oferta} query={debouncedSearch} />
+                      <HighlightText text={oferta.fechaOferta} query={debouncedSearch} />
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
-                      <TableCell colSpan={8} className="whitespace-normal py-3">
+                      <TableCell colSpan={colSpan} className="whitespace-normal py-3">
                         <p className="mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                          Fila original ({oferta.archivo_origen}, publicada a
-                          las {oferta.hora_oferta}):
+                          Fila original ({oferta.archivoOrigen}, publicada a
+                          las {oferta.horaOferta}):
                         </p>
                         <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-zinc-800 dark:bg-black dark:text-zinc-200">
-                          {JSON.stringify(oferta.raw_data, null, 2)}
+                          {JSON.stringify(oferta.rawData, null, 2)}
                         </pre>
                       </TableCell>
                     </TableRow>
@@ -287,6 +376,29 @@ export default function OfertasView() {
           </TableBody>
         </Table>
       </div>
+
+      {editOpen && selectedOferta && (
+        <EditarOfertaDialog
+          oferta={selectedOferta}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onUpdated={handleSingleUpdated}
+        />
+      )}
+      {editOpen && !selectedOferta && selectedIds.size > 1 && (
+        <BulkEditarOfertaDialog
+          ids={[...selectedIds]}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onUpdated={handleBulkUpdated}
+        />
+      )}
+      <EliminarOfertasDialog
+        ids={[...selectedIds]}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={handleDeleted}
+      />
     </>
   );
 }

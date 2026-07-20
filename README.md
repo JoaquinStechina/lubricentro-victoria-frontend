@@ -31,9 +31,15 @@ confiar solo en este gate del lado del cliente.
 `app/lib/session.ts` (`getSession()`) hace la misma verificación del lado
 del servidor para Server Components y Route Handlers — usado en
 `app/layout.tsx` (que arma el `SessionProvider`/`useSession()` consumido
-por `UserMenu` y por las páginas para mostrar/ocultar acciones según rol) y
-en `app/api/productos` / `app/api/ofertas` (devuelven 401 sin sesión, como
-defensa además del gate de `proxy.ts`).
+por `UserMenu` y por las páginas para mostrar/ocultar acciones según rol,
+incluyendo la columna de selección y la barra Editar/Eliminar de
+Catálogo/Ofertas, visibles solo para `ADMINISTRADOR`+).
+
+El gate de rol del lado del cliente (ocultar botones) es solo UX: la
+autorización real la vuelve a validar el backend en cada endpoint que
+muta datos (`requireRole`, ver `../backend/README.md`) — por ejemplo, un
+`EMPLEADO` que llame `PATCH /api/productos/:id` directo recibe 403 aunque
+la UI nunca le muestre el botón.
 
 Requiere `JWT_SECRET` en `.env.local` — **mismo valor** que
 `JWT_SECRET` en `backend/.env`, porque ambos firman/verifican el mismo
@@ -48,8 +54,22 @@ token.
 - Las coincidencias se **resaltan** en cualquier columna donde aparezcan.
 - Filas con datos del proveedor que no entran en el schema canónico se pueden expandir para ver el `raw_data` original.
 - Tema claro/oscuro automático según preferencia del sistema operativo.
-- **Cargar archivo** (`/cargas`): a diferencia de todo lo anterior (que lee los JSON estáticos de
-  `data/`), esta sección habla en vivo con el backend nuevo (`../backend`, Express + Prisma).
+- **Editar y eliminar filas** (`/`, ambas pestañas, solo `ADMINISTRADOR`+): cada fila tiene un
+  checkbox de selección, más uno en el header para seleccionar todas las filas de la página
+  actual (no todo el resultado filtrado). Con filas seleccionadas aparece una barra con:
+  - **Editar**: con 1 fila seleccionada abre un formulario con todos sus campos editables
+    (`EditarProductoDialog.tsx` / `EditarOfertaDialog.tsx`, `PATCH /api/productos|ofertas/:id`);
+    con más de una, abre un diálogo de edición en lote que aplica un mismo valor a un único campo
+    de una lista reducida de campos "seguros" (`BulkEditarProductoDialog.tsx` /
+    `BulkEditarOfertaDialog.tsx`, `POST /api/productos|ofertas/editar-lote`) — no incluye campos
+    identificadores como marca/SKU/descripción, para no corromper datos al aplicar en lote.
+  - **Eliminar**: pide confirmación y hace un borrado **lógico** (`POST
+    /api/productos|ofertas/eliminar`, marca `eliminado: true`) — la fila deja de aparecer en la
+    UI pero nunca se borra físicamente de la base.
+
+  Ver `../backend/README.md` para las listas blancas de campos editables y el detalle de cada
+  endpoint.
+- **Cargar archivo** (`/cargas`): habla en vivo con el backend (`../backend`, Express + Prisma).
   Subís un archivo (imagen, PDF o excel) de un proveedor, se procesa con IA, y antes de guardar
   nada se muestra una pantalla de revisión donde se puede corregir el mapeo de columnas y
   cualquier valor extraído a mano — ninguna carga se publica sin confirmación humana. Esa misma
@@ -84,4 +104,11 @@ Abrí [http://localhost:3000](http://localhost:3000) — redirige a `/login`.
 
 ## Datos
 
-Los datos parseados viven en `data/productos_todos.json` y `data/ofertas.json`, leídos por `app/lib/productos.ts` y `app/lib/ofertas.ts` y expuestos vía `app/api/productos` y `app/api/ofertas`. Esto es aparte y no se actualiza con lo que se confirma en `/cargas` — ver `../contexto.md` para el detalle de esta desprolijidad conocida.
+`/` (Catálogo/Ofertas), `/cargas` y `/cargas/gestion` leen todas del backend real (`../backend`,
+Express + Prisma) vía `apiFetch` (`app/lib/api.ts`) — no hay ninguna vista que dependa de datos
+locales al frontend. `app/lib/productos.ts` y `app/lib/ofertas.ts` solo exponen los tipos
+(`Producto`/`Oferta`, con el mismo shape camelCase que devuelve la API) y las listas blancas de
+campos editables, ya no cargan ni consultan JSON.
+
+`data/productos_todos.json` y `data/ofertas.json` son un snapshot del prototipo original —
+ya no los lee ningún código del proyecto, se pueden borrar sin impacto.

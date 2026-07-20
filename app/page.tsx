@@ -45,12 +45,8 @@ export default function Home() {
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
           <TabsList className="mb-6">
-            <TabsTrigger value="catalogo">
-              Catálogo ({(31586).toLocaleString("es-AR")})
-            </TabsTrigger>
-            <TabsTrigger value="ofertas">
-              Ofertas ({(1018).toLocaleString("es-AR")})
-            </TabsTrigger>
+            <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
+            <TabsTrigger value="ofertas">Ofertas</TabsTrigger>
           </TabsList>
 
           <TabsContent value="catalogo">

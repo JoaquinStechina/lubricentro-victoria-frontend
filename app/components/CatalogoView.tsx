@@ -1,16 +1,23 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
+import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import HighlightText from "@/app/components/HighlightText";
+import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
+import BulkEditarProductoDialog from "@/app/components/catalogo/BulkEditarProductoDialog";
+import EliminarProductosDialog from "@/app/components/catalogo/EliminarProductosDialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
   TableCell,
+  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -48,12 +55,20 @@ function formatPrecio(valor: number | null) {
 }
 
 export default function CatalogoView() {
+  const session = useSession();
+  const puedeEditar = session?.rol === "ADMINISTRADOR" || session?.rol === "SYSADMIN";
+
   const [search, setSearch] = useState("");
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Debounce los campos de texto para no disparar un fetch por cada tecla.
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -94,11 +109,11 @@ export default function CatalogoView() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/productos?${params.toString()}`);
-        const json: ApiResponse = await res.json();
+        const json = await apiFetch<ApiResponse>(`/api/productos?${params.toString()}`);
         if (active) {
           setData(json);
           setExpandedRow(null);
+          setSelectedIds(new Set());
         }
       } finally {
         if (active) setLoading(false);
@@ -109,7 +124,7 @@ export default function CatalogoView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, page]);
+  }, [debouncedSearch, debouncedColumnFilters, page, reloadTick]);
 
   const hayFiltrosActivos =
     search || Object.values(columnFilters).some((v) => v);
@@ -125,6 +140,51 @@ export default function CatalogoView() {
     const end = Math.min(data.page * data.pageSize, data.total);
     return `${start}–${end} de ${data.total.toLocaleString("es-AR")}`;
   }, [data]);
+
+  const visibleIds = data?.items.map((p) => p.id) ?? [];
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someSelected = !allSelected && visibleIds.some((id) => selectedIds.has(id));
+
+  function toggleAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(visibleIds));
+  }
+  function toggleRow(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedProducto =
+    selectedIds.size === 1 ? (data?.items.find((p) => selectedIds.has(p.id)) ?? null) : null;
+
+  function handleSingleUpdated(actualizado: Producto) {
+    setData((prev) =>
+      prev ? { ...prev, items: prev.items.map((p) => (p.id === actualizado.id ? actualizado : p)) } : prev
+    );
+    setSelectedIds(new Set());
+  }
+  function handleBulkUpdated() {
+    setSelectedIds(new Set());
+    setReloadTick((t) => t + 1);
+  }
+  function handleDeleted(ids: number[]) {
+    const eliminados = new Set(ids);
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.filter((p) => !eliminados.has(p.id)),
+            total: Math.max(0, prev.total - eliminados.size),
+          }
+        : prev
+    );
+    setSelectedIds(new Set());
+  }
+
+  const colSpan = puedeEditar ? 10 : 9;
 
   return (
     <>
@@ -178,10 +238,34 @@ export default function CatalogoView() {
         )}
       </div>
 
+      {puedeEditar && selectedIds.size > 0 && (
+        <div className="mb-2 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
+          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            Editar
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+            Eliminar
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <Table className="min-w-[900px]">
           <TableHeader>
             <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              {puedeEditar && (
+                <TableHead>
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={someSelected}
+                    onCheckedChange={toggleAll}
+                    aria-label="Seleccionar todo"
+                  />
+                </TableHead>
+              )}
               <ColumnFilterHeader
                 label="Proveedor"
                 value={columnFilters.proveedor}
@@ -236,34 +320,43 @@ export default function CatalogoView() {
             {!loading && data && data.items.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={colSpan}
                   className="py-8 text-center whitespace-normal text-zinc-500 dark:text-zinc-400"
                 >
                   No se encontraron productos con esos filtros.
                 </TableCell>
               </TableRow>
             )}
-            {data?.items.map((producto, idx) => {
-              const isExpanded = expandedRow === idx;
+            {data?.items.map((producto) => {
+              const isExpanded = expandedRow === producto.id;
               const hasRawData =
-                producto.raw_data && Object.keys(producto.raw_data).length > 0;
+                producto.rawData && Object.keys(producto.rawData).length > 0;
               return (
-                <Fragment key={`${producto.sku_interno ?? "s"}-${idx}`}>
+                <Fragment key={producto.id}>
                   <TableRow
                     onClick={() =>
-                      hasRawData && setExpandedRow(isExpanded ? null : idx)
+                      hasRawData && setExpandedRow(isExpanded ? null : producto.id)
                     }
                     className={hasRawData ? "cursor-pointer" : ""}
                   >
+                    {puedeEditar && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(producto.id)}
+                          onCheckedChange={() => toggleRow(producto.id)}
+                          aria-label="Seleccionar fila"
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={producto.proveedor} query={debouncedSearch} />
+                      <HighlightText text={producto.proveedor?.nombre ?? "—"} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <HighlightText text={producto.marca ?? "—"} query={debouncedSearch} />
                     </TableCell>
                     <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
                       <HighlightText
-                        text={producto.sku_interno ?? producto.sku_proveedor ?? "—"}
+                        text={producto.skuInterno ?? producto.skuProveedor ?? "—"}
                         query={debouncedSearch}
                       />
                     </TableCell>
@@ -278,38 +371,38 @@ export default function CatalogoView() {
                     </TableCell>
                     <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
                       <HighlightText
-                        text={formatPrecio(producto.precio_neto)}
+                        text={formatPrecio(producto.precioNeto)}
                         query={debouncedSearch}
                       />
                     </TableCell>
                     <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
                       <HighlightText
-                        text={formatPrecio(producto.precio_con_iva)}
+                        text={formatPrecio(producto.precioConIva)}
                         query={debouncedSearch}
                       />
                     </TableCell>
                     <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
                       <HighlightText
-                        text={producto.alicuota_iva !== null ? String(producto.alicuota_iva) : "—"}
+                        text={producto.alicuotaIva !== null ? String(producto.alicuotaIva) : "—"}
                         query={debouncedSearch}
                       />
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <HighlightText
-                        text={producto.fecha_vigencia ?? "—"}
+                        text={producto.fechaVigencia ?? "—"}
                         query={debouncedSearch}
                       />
                     </TableCell>
                   </TableRow>
                   {isExpanded && hasRawData && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
-                      <TableCell colSpan={9} className="whitespace-normal py-3">
+                      <TableCell colSpan={colSpan} className="whitespace-normal py-3">
                         <p className="mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
                           Columnas originales no mapeadas al schema canónico
                           (raw_data):
                         </p>
                         <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-zinc-800 dark:bg-black dark:text-zinc-200">
-                          {JSON.stringify(producto.raw_data, null, 2)}
+                          {JSON.stringify(producto.rawData, null, 2)}
                         </pre>
                       </TableCell>
                     </TableRow>
@@ -320,6 +413,29 @@ export default function CatalogoView() {
           </TableBody>
         </Table>
       </div>
+
+      {editOpen && selectedProducto && (
+        <EditarProductoDialog
+          producto={selectedProducto}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onUpdated={handleSingleUpdated}
+        />
+      )}
+      {editOpen && !selectedProducto && selectedIds.size > 1 && (
+        <BulkEditarProductoDialog
+          ids={[...selectedIds]}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onUpdated={handleBulkUpdated}
+        />
+      )}
+      <EliminarProductosDialog
+        ids={[...selectedIds]}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={handleDeleted}
+      />
     </>
   );
 }

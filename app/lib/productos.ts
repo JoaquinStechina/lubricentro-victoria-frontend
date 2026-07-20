@@ -1,32 +1,27 @@
-import fs from "node:fs";
-import path from "node:path";
-import { normalizeText } from "@/app/lib/text";
-
+// Tipo que devuelve el backend real (Express/Prisma, repo hermano `backend/`)
+// en GET /api/productos — ver backend/src/routes/productos.ts. Reemplaza al
+// prototipo anterior que leía data/productos_todos.json en memoria.
 export type Producto = {
-  proveedor: string;
+  id: number;
+  proveedorId: number;
+  proveedor: { id: number; nombre: string } | null;
   marca: string | null;
-  sku_proveedor: string | null;
-  sku_interno: string | null;
+  skuProveedor: string | null;
+  skuInterno: string | null;
   descripcion: string | null;
   seccion: string | null;
-  precio_neto: number | null;
-  precio_con_iva: number | null;
-  alicuota_iva: number | null;
-  moneda: string | null;
+  precioNeto: number | null;
+  precioConIva: number | null;
+  alicuotaIva: number | null;
+  moneda: string;
   unidad: string | null;
-  fecha_vigencia: string | null;
-  raw_data: Record<string, unknown>;
+  fechaVigencia: string | null;
+  vigente: boolean;
+  eliminado: boolean;
+  rawData: Record<string, unknown> | null;
+  cargaId: number | null;
+  createdAt: string;
 };
-
-let cache: Producto[] | null = null;
-
-function loadProductos(): Producto[] {
-  if (cache) return cache;
-  const filePath = path.join(process.cwd(), "data", "productos_todos.json");
-  const raw = fs.readFileSync(filePath, "utf-8");
-  cache = JSON.parse(raw) as Producto[];
-  return cache;
-}
 
 export type ProductoColumnKey =
   | "proveedor"
@@ -39,87 +34,51 @@ export type ProductoColumnKey =
   | "alicuotaIva"
   | "fechaVigencia";
 
-function getColumnValue(p: Producto, key: ProductoColumnKey): string {
-  switch (key) {
-    case "proveedor":
-      return p.proveedor ?? "";
-    case "marca":
-      return p.marca ?? "";
-    case "sku":
-      return p.sku_interno ?? p.sku_proveedor ?? "";
-    case "descripcion":
-      return p.descripcion ?? "";
-    case "seccion":
-      return p.seccion ?? "";
-    case "precioNeto":
-      return p.precio_neto !== null ? String(p.precio_neto) : "";
-    case "precioConIva":
-      return p.precio_con_iva !== null ? String(p.precio_con_iva) : "";
-    case "alicuotaIva":
-      return p.alicuota_iva !== null ? String(p.alicuota_iva) : "";
-    case "fechaVigencia":
-      return p.fecha_vigencia ?? "";
-  }
-}
+// Campos que puede tocar PATCH /api/productos/:id (edición de una fila).
+export const PRODUCTO_SINGLE_EDIT_FIELDS = [
+  "marca",
+  "skuProveedor",
+  "skuInterno",
+  "descripcion",
+  "seccion",
+  "precioNeto",
+  "precioConIva",
+  "alicuotaIva",
+  "moneda",
+  "unidad",
+  "fechaVigencia",
+] as const;
+export type ProductoSingleEditField = (typeof PRODUCTO_SINGLE_EDIT_FIELDS)[number];
 
-export type QueryParams = {
-  search?: string;
-  columnFilters?: Partial<Record<ProductoColumnKey, string>>;
-  page: number;
-  pageSize: number;
+// Campos que puede tocar POST /api/productos/editar-lote (subset más chico:
+// excluye identificadores como marca/sku/descripción, ver backend).
+export const PRODUCTO_BULK_EDIT_FIELDS = [
+  "seccion",
+  "precioNeto",
+  "precioConIva",
+  "alicuotaIva",
+  "moneda",
+  "unidad",
+  "fechaVigencia",
+] as const;
+export type ProductoBulkEditField = (typeof PRODUCTO_BULK_EDIT_FIELDS)[number];
+
+export const PRODUCTO_FIELD_LABELS: Record<ProductoSingleEditField, string> = {
+  marca: "Marca",
+  skuProveedor: "SKU proveedor",
+  skuInterno: "SKU interno",
+  descripcion: "Descripción",
+  seccion: "Sección",
+  precioNeto: "Precio neto",
+  precioConIva: "Precio c/IVA",
+  alicuotaIva: "IVA %",
+  moneda: "Moneda",
+  unidad: "Unidad",
+  fechaVigencia: "Vigencia",
 };
 
-export type QueryResult = {
-  items: Producto[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-};
-
-export function queryProductos({
-  search,
-  columnFilters,
-  page,
-  pageSize,
-}: QueryParams): QueryResult {
-  const productos = loadProductos();
-  const term = search?.trim() ? normalizeText(search.trim()) : undefined;
-  const activeColumnFilters = Object.entries(columnFilters ?? {})
-    .filter((entry): entry is [ProductoColumnKey, string] => Boolean(entry[1]?.trim()))
-    .map(([key, value]) => [key, normalizeText(value.trim())] as const);
-
-  const filtered = productos.filter((p) => {
-    for (const [key, needle] of activeColumnFilters) {
-      if (!normalizeText(getColumnValue(p, key)).includes(needle)) return false;
-    }
-    if (term) {
-      const haystack = [
-        p.proveedor,
-        p.marca,
-        p.sku_interno,
-        p.sku_proveedor,
-        p.descripcion,
-        p.seccion,
-        p.precio_neto,
-        p.precio_con_iva,
-        p.alicuota_iva,
-        p.moneda,
-        p.unidad,
-        p.fecha_vigencia,
-      ]
-        .filter((v) => v !== null && v !== undefined)
-        .join(" ");
-      if (!normalizeText(haystack).includes(term)) return false;
-    }
-    return true;
-  });
-
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const start = (safePage - 1) * pageSize;
-  const items = filtered.slice(start, start + pageSize);
-
-  return { items, total, page: safePage, pageSize, totalPages };
-}
+export const PRODUCTO_NUMERIC_FIELDS = new Set<string>([
+  "precioNeto",
+  "precioConIva",
+  "alicuotaIva",
+]);
