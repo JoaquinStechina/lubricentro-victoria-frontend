@@ -30,6 +30,7 @@ export default async function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         {/* shadcn's `dark` variant is class-based, not media-based; this
