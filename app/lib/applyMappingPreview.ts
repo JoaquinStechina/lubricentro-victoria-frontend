@@ -22,17 +22,28 @@ export function applyMappingPreview(
   mapping: ColumnMapping
 ): CanonicalRowInput[] {
   return rows.map((row) => {
-    const canonical: Partial<Record<CanonicalField, string>> = {};
+    const valoresPorDestino = new Map<CanonicalField, string[]>();
     const rawData: Record<string, unknown> = {};
 
     for (const h of headers) {
       const destino = mapping[h];
       const valor = row[h];
       if (destino) {
-        canonical[destino] = toDisplayString(valor);
+        const lista = valoresPorDestino.get(destino) ?? [];
+        lista.push(toDisplayString(valor));
+        valoresPorDestino.set(destino, lista);
       } else if (valor !== null && valor !== undefined && valor !== "") {
         rawData[h] = valor;
       }
+    }
+
+    // Si dos o más columnas mapean al mismo campo (ej. "Producto" y "Envase"
+    // -> descripcion), se concatenan en orden separadas por espacio,
+    // salteando valores vacíos. Mantener sincronizado con applyMapping en
+    // backend/src/extraction/mapping.ts.
+    const canonical: Partial<Record<CanonicalField, string>> = {};
+    for (const [destino, valores] of valoresPorDestino) {
+      canonical[destino] = valores.filter((v) => v !== "").join(" ");
     }
 
     // seccion/marca: si no vinieron de una columna mapeada, caen del campo

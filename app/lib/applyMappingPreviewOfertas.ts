@@ -24,17 +24,27 @@ export function applyMappingPreviewOfertas(
   metadata: OfertaMetadata
 ): OfertaRowInput[] {
   return rows.map((row) => {
-    const canonical: Partial<Record<OfertaField, string>> = {};
+    const valoresPorDestino = new Map<OfertaField, string[]>();
     const rawData: Record<string, unknown> = {};
 
     for (const h of headers) {
       const destino = mapping[h];
       const valor = row[h];
       if (destino) {
-        canonical[destino] = toDisplayString(valor);
+        const lista = valoresPorDestino.get(destino) ?? [];
+        lista.push(toDisplayString(valor));
+        valoresPorDestino.set(destino, lista);
       } else if (valor !== null && valor !== undefined && valor !== "") {
         rawData[h] = valor;
       }
+    }
+
+    // Si dos o más columnas mapean al mismo campo, se concatenan en orden
+    // separadas por espacio. Mantener sincronizado con applyMappingOfertas en
+    // backend/src/extraction/mappingOfertas.ts.
+    const canonical: Partial<Record<OfertaField, string>> = {};
+    for (const [destino, valores] of valoresPorDestino) {
+      canonical[destino] = valores.filter((v) => v !== "").join(" ");
     }
 
     if (!canonical.marca && metadata.marca) canonical.marca = metadata.marca;
