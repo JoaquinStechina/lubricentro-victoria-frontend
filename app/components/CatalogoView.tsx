@@ -14,6 +14,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -30,7 +37,7 @@ type ApiResponse = {
   totalPages: number;
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZES = [50, 100, 200] as const;
 
 const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   proveedor: "",
@@ -38,11 +45,15 @@ const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   sku: "",
   descripcion: "",
   seccion: "",
-  precioNeto: "",
-  precioConIva: "",
+  precioNetoMin: "",
+  precioNetoMax: "",
+  precioConIvaMin: "",
+  precioConIvaMax: "",
   alicuotaIva: "",
   fechaVigencia: "",
 };
+
+type SortState = { campo: string; order: "asc" | "desc" } | null;
 
 const currencyFormatter = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -61,10 +72,27 @@ export default function CatalogoView() {
   const [search, setSearch] = useState("");
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
+  const [sort, setSort] = useState<SortState>(null);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+
+  // Valores para el combobox del filtro de Sección; si el fetch falla el
+  // filtro simplemente queda vacío (se puede seguir usando el resto).
+  const [secciones, setSecciones] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    apiFetch<(string | null)[]>("/api/productos/secciones")
+      .then((data) => {
+        if (active) setSecciones(data.filter((s): s is string => s !== null && s !== ""));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
@@ -87,9 +115,20 @@ export default function CatalogoView() {
     setColumnFilters((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Cualquier cambio de filtro vuelve a la página 1 (ajuste de estado durante
-  // el render, ver https://react.dev/learn/you-might-not-need-an-effect).
-  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}`;
+  // El ciclo de orden por columna es asc → desc → sin orden; ordenar por
+  // otra columna arranca de nuevo en asc.
+  function toggleSort(campo: string) {
+    setSort((prev) => {
+      if (!prev || prev.campo !== campo) return { campo, order: "asc" };
+      if (prev.order === "asc") return { campo, order: "desc" };
+      return null;
+    });
+  }
+
+  // Cualquier cambio de filtro/orden/tamaño vuelve a la página 1 (ajuste de
+  // estado durante el render, ver
+  // https://react.dev/learn/you-might-not-need-an-effect).
+  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -103,8 +142,12 @@ export default function CatalogoView() {
     for (const [key, value] of Object.entries(debouncedColumnFilters)) {
       if (value) params.set(`f_${key}`, value);
     }
+    if (sort) {
+      params.set("sort", sort.campo);
+      params.set("order", sort.order);
+    }
     params.set("page", String(page));
-    params.set("pageSize", String(PAGE_SIZE));
+    params.set("pageSize", String(pageSize));
 
     async function load() {
       setLoading(true);
@@ -124,7 +167,7 @@ export default function CatalogoView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, page, reloadTick]);
+  }, [debouncedSearch, debouncedColumnFilters, sort, page, pageSize, reloadTick]);
 
   const hayFiltrosActivos =
     search || Object.values(columnFilters).some((v) => v);
@@ -213,29 +256,52 @@ export default function CatalogoView() {
 
       <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
         <span>{loading ? "Cargando…" : rangoResultados}</span>
-        {data && data.totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={data.page <= 1}
-            >
-              Anterior
-            </Button>
-            <span>
-              Página {data.page} de {data.totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-              disabled={data.page >= data.totalPages}
-            >
-              Siguiente
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {data && data.total > 0 && (
+            <label className="flex items-center gap-1.5">
+              <span className="text-xs">Filas por página</span>
+              <Select
+                items={Object.fromEntries(PAGE_SIZES.map((n) => [String(n), String(n)]))}
+                value={String(pageSize)}
+                onValueChange={(v) => setPageSize(Number(v))}
+              >
+                <SelectTrigger size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZES.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+          )}
+          {data && data.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={data.page <= 1}
+              >
+                Anterior
+              </Button>
+              <span>
+                Página {data.page} de {data.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={data.page >= data.totalPages}
+              >
+                Siguiente
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {puedeEditar && selectedIds.size > 0 && (
@@ -270,49 +336,83 @@ export default function CatalogoView() {
                 label="Proveedor"
                 value={columnFilters.proveedor}
                 onChange={(v) => setColumnFilter("proveedor", v)}
+                sortDirection={sort?.campo === "proveedor" ? sort.order : null}
+                onSortToggle={() => toggleSort("proveedor")}
               />
               <ColumnFilterHeader
                 label="Marca"
                 value={columnFilters.marca}
                 onChange={(v) => setColumnFilter("marca", v)}
+                sortDirection={sort?.campo === "marca" ? sort.order : null}
+                onSortToggle={() => toggleSort("marca")}
               />
               <ColumnFilterHeader
                 label="SKU interno"
                 value={columnFilters.sku}
                 onChange={(v) => setColumnFilter("sku", v)}
+                sortDirection={sort?.campo === "sku" ? sort.order : null}
+                onSortToggle={() => toggleSort("sku")}
               />
               <ColumnFilterHeader
                 label="Descripción"
                 value={columnFilters.descripcion}
                 onChange={(v) => setColumnFilter("descripcion", v)}
+                sortDirection={sort?.campo === "descripcion" ? sort.order : null}
+                onSortToggle={() => toggleSort("descripcion")}
               />
               <ColumnFilterHeader
                 label="Sección"
                 value={columnFilters.seccion}
                 onChange={(v) => setColumnFilter("seccion", v)}
+                searchOptions={secciones}
+                sortDirection={sort?.campo === "seccion" ? sort.order : null}
+                onSortToggle={() => toggleSort("seccion")}
               />
               <ColumnFilterHeader
                 label="Precio neto"
-                value={columnFilters.precioNeto}
-                onChange={(v) => setColumnFilter("precioNeto", v)}
+                value=""
+                onChange={() => {}}
+                rangeValue={{ min: columnFilters.precioNetoMin, max: columnFilters.precioNetoMax }}
+                onRangeChange={(min, max) =>
+                  setColumnFilters((prev) => ({ ...prev, precioNetoMin: min, precioNetoMax: max }))
+                }
                 align="right"
+                sortDirection={sort?.campo === "precioNeto" ? sort.order : null}
+                onSortToggle={() => toggleSort("precioNeto")}
               />
               <ColumnFilterHeader
                 label="Precio c/IVA"
-                value={columnFilters.precioConIva}
-                onChange={(v) => setColumnFilter("precioConIva", v)}
+                value=""
+                onChange={() => {}}
+                rangeValue={{
+                  min: columnFilters.precioConIvaMin,
+                  max: columnFilters.precioConIvaMax,
+                }}
+                onRangeChange={(min, max) =>
+                  setColumnFilters((prev) => ({
+                    ...prev,
+                    precioConIvaMin: min,
+                    precioConIvaMax: max,
+                  }))
+                }
                 align="right"
+                sortDirection={sort?.campo === "precioConIva" ? sort.order : null}
+                onSortToggle={() => toggleSort("precioConIva")}
               />
               <ColumnFilterHeader
                 label="IVA %"
                 value={columnFilters.alicuotaIva}
                 onChange={(v) => setColumnFilter("alicuotaIva", v)}
                 align="right"
+                sortDirection={sort?.campo === "alicuotaIva" ? sort.order : null}
+                onSortToggle={() => toggleSort("alicuotaIva")}
               />
               <ColumnFilterHeader
                 label="Vigencia"
                 value={columnFilters.fechaVigencia}
                 onChange={(v) => setColumnFilter("fechaVigencia", v)}
+                sortDirection={sort?.campo === "fechaVigencia" ? sort.order : null}
+                onSortToggle={() => toggleSort("fechaVigencia")}
               />
             </TableRow>
           </TableHeader>

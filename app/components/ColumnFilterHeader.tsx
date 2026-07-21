@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Filter } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckIcon, ChevronsUpDown, Filter } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -18,6 +26,8 @@ import { cn } from "@/lib/utils";
 
 const SELECT_ALL_VALUE = "__all__";
 
+export type SortDirection = "asc" | "desc" | null;
+
 type ColumnFilterHeaderProps = {
   label: string;
   value: string;
@@ -27,11 +37,22 @@ type ColumnFilterHeaderProps = {
   // en vez de un texto libre (ej. "Vigencia": hasta agotar stock vs. con
   // fecha de vencimiento, algo que no se puede resolver con "contains").
   options?: { value: string; label: string }[];
+  // Como `options` pero con búsqueda (Command/cmdk) — para listas largas
+  // como las +490 secciones del catálogo. Elegir setea `value` completo.
+  searchOptions?: string[];
   // Filtro adicional por fecha exacta (input type="date") debajo del
   // principal — ej. "Válida hasta": además de la categoría, buscar las que
   // vencen un día puntual.
   dateValue?: string;
   onDateChange?: (value: string) => void;
+  // Filtro por rango numérico (Mín/Máx) en vez del texto libre.
+  rangeValue?: { min: string; max: string };
+  onRangeChange?: (min: string, max: string) => void;
+  // Orden por columna: si onSortToggle viene, el label es clickeable y
+  // muestra la flecha según sortDirection. El ciclo asc→desc→null lo maneja
+  // el padre (es global a la tabla, no por columna).
+  sortDirection?: SortDirection;
+  onSortToggle?: () => void;
 };
 
 export default function ColumnFilterHeader({
@@ -40,11 +61,25 @@ export default function ColumnFilterHeader({
   onChange,
   align = "left",
   options,
+  searchOptions,
   dateValue,
   onDateChange,
+  rangeValue,
+  onRangeChange,
+  sortDirection = null,
+  onSortToggle,
 }: ColumnFilterHeaderProps) {
   const [open, setOpen] = useState(false);
-  const active = value.trim().length > 0 || (dateValue ?? "").trim().length > 0;
+  const active =
+    value.trim().length > 0 ||
+    (dateValue ?? "").trim().length > 0 ||
+    (rangeValue ? rangeValue.min.trim().length > 0 || rangeValue.max.trim().length > 0 : false);
+
+  function limpiar() {
+    onChange("");
+    onDateChange?.("");
+    onRangeChange?.("", "");
+  }
 
   return (
     <TableHead className={align === "right" ? "text-right" : undefined}>
@@ -54,7 +89,25 @@ export default function ColumnFilterHeader({
           align === "right" && "flex-row-reverse"
         )}
       >
-        <span>{label}</span>
+        {onSortToggle ? (
+          <button
+            type="button"
+            onClick={onSortToggle}
+            className="flex items-center gap-0.5 hover:text-foreground"
+            aria-label={`Ordenar por ${label.toLowerCase()}`}
+          >
+            <span>{label}</span>
+            {sortDirection === "asc" ? (
+              <ArrowUp className="size-3 text-foreground" />
+            ) : sortDirection === "desc" ? (
+              <ArrowDown className="size-3 text-foreground" />
+            ) : (
+              <ChevronsUpDown className="size-3 text-muted-foreground/50" />
+            )}
+          </button>
+        ) : (
+          <span>{label}</span>
+        )}
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger
             render={
@@ -74,10 +127,46 @@ export default function ColumnFilterHeader({
             )}
           </PopoverTrigger>
           <PopoverContent
-            className="w-56 p-2"
+            className={cn("w-56", searchOptions ? "p-0" : "p-2")}
             align={align === "right" ? "end" : "start"}
           >
-            {options ? (
+            {searchOptions ? (
+              <Command>
+                <CommandInput placeholder={`Buscar ${label.toLowerCase()}…`} />
+                <CommandList>
+                  <CommandEmpty>Sin resultados.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value={SELECT_ALL_VALUE}
+                      onSelect={() => {
+                        onChange("");
+                        setOpen(false);
+                      }}
+                    >
+                      <CheckIcon
+                        className={cn("size-3.5", value === "" ? "opacity-100" : "opacity-0")}
+                      />
+                      Todas
+                    </CommandItem>
+                    {searchOptions.map((opcion) => (
+                      <CommandItem
+                        key={opcion}
+                        value={opcion}
+                        onSelect={() => {
+                          onChange(opcion);
+                          setOpen(false);
+                        }}
+                      >
+                        <CheckIcon
+                          className={cn("size-3.5", value === opcion ? "opacity-100" : "opacity-0")}
+                        />
+                        {opcion}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            ) : options ? (
               <Select
                 items={{
                   [SELECT_ALL_VALUE]: "Todas",
@@ -100,6 +189,25 @@ export default function ColumnFilterHeader({
                   ))}
                 </SelectContent>
               </Select>
+            ) : rangeValue && onRangeChange ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  type="number"
+                  value={rangeValue.min}
+                  onChange={(e) => onRangeChange(e.target.value, rangeValue.max)}
+                  placeholder="Mín"
+                  className="h-8"
+                />
+                <span className="text-xs text-muted-foreground">–</span>
+                <Input
+                  type="number"
+                  value={rangeValue.max}
+                  onChange={(e) => onRangeChange(rangeValue.min, e.target.value)}
+                  placeholder="Máx"
+                  className="h-8"
+                />
+              </div>
             ) : (
               <Input
                 autoFocus
@@ -120,13 +228,10 @@ export default function ColumnFilterHeader({
                 />
               </div>
             )}
-            {active && (
+            {active && !searchOptions && (
               <button
                 type="button"
-                onClick={() => {
-                  onChange("");
-                  onDateChange?.("");
-                }}
+                onClick={limpiar}
                 className="mt-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
                 Limpiar filtro

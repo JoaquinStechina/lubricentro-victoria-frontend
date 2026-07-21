@@ -23,14 +23,18 @@ export type Producto = {
   createdAt: string;
 };
 
+// Claves de filtro por columna (se mandan como f_<clave> al backend). Los
+// precios se filtran por rango, por eso tienen clave Min y Max separadas.
 export type ProductoColumnKey =
   | "proveedor"
   | "marca"
   | "sku"
   | "descripcion"
   | "seccion"
-  | "precioNeto"
-  | "precioConIva"
+  | "precioNetoMin"
+  | "precioNetoMax"
+  | "precioConIvaMin"
+  | "precioConIvaMax"
   | "alicuotaIva"
   | "fechaVigencia";
 

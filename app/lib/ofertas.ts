@@ -24,14 +24,19 @@ export type Oferta = {
   createdAt: string;
 };
 
+// Claves de filtro por columna (se mandan como f_<clave> al backend).
+// Descuento y precio unitario se filtran por rango (clave Min/Max) — esto
+// además corrige el nombre viejo "descuento", que el backend nunca leyó.
 export type OfertaColumnKey =
   | "marca"
   | "numeroOferta"
   | "sku"
   | "descripcion"
   | "desdeCantidad"
-  | "descuento"
-  | "precioUnitario"
+  | "descuentoPctMin"
+  | "descuentoPctMax"
+  | "precioUnitarioMin"
+  | "precioUnitarioMax"
   | "fechaOferta"
   | "vigencia"
   | "fechaHasta";

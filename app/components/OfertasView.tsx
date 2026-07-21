@@ -14,6 +14,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -26,7 +33,7 @@ type ApiResponse = {
   ofertas: Oferta[];
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZES = [50, 100, 200] as const;
 
 const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
   marca: "",
@@ -34,12 +41,16 @@ const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
   sku: "",
   descripcion: "",
   desdeCantidad: "",
-  descuento: "",
-  precioUnitario: "",
+  descuentoPctMin: "",
+  descuentoPctMax: "",
+  precioUnitarioMin: "",
+  precioUnitarioMax: "",
   fechaOferta: "",
   vigencia: "",
   fechaHasta: "",
 };
+
+type SortState = { campo: string; order: "asc" | "desc" } | null;
 
 // "sin_fecha"/"con_fecha" en vez de comparar contra un valor de texto: null
 // en fechaHasta no se puede buscar con un filtro "contains" (ver
@@ -68,6 +79,8 @@ export default function OfertasView() {
   const [search, setSearch] = useState("");
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
+  const [sort, setSort] = useState<SortState>(null);
   const [allOfertas, setAllOfertas] = useState<Oferta[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -93,7 +106,17 @@ export default function OfertasView() {
     setColumnFilters((prev) => ({ ...prev, [key]: value }));
   }
 
-  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}`;
+  // El ciclo de orden por columna es asc → desc → sin orden; ordenar por
+  // otra columna arranca de nuevo en asc.
+  function toggleSort(campo: string) {
+    setSort((prev) => {
+      if (!prev || prev.campo !== campo) return { campo, order: "asc" };
+      if (prev.order === "asc") return { campo, order: "desc" };
+      return null;
+    });
+  }
+
+  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -106,6 +129,10 @@ export default function OfertasView() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     for (const [key, value] of Object.entries(debouncedColumnFilters)) {
       if (value) params.set(`f_${key}`, value);
+    }
+    if (sort) {
+      params.set("sort", sort.campo);
+      params.set("order", sort.order);
     }
 
     async function load() {
@@ -126,7 +153,7 @@ export default function OfertasView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, reloadTick]);
+  }, [debouncedSearch, debouncedColumnFilters, sort, reloadTick]);
 
   const hayFiltrosActivos =
     search || Object.values(columnFilters).some((v) => v);
@@ -137,18 +164,18 @@ export default function OfertasView() {
   }
 
   const total = allOfertas?.length ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageItems = useMemo(
-    () => (allOfertas ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [allOfertas, page]
+    () => (allOfertas ?? []).slice((page - 1) * pageSize, page * pageSize),
+    [allOfertas, page, pageSize]
   );
 
   const rangoResultados = useMemo(() => {
     if (total === 0) return "0 resultados";
-    const start = (page - 1) * PAGE_SIZE + 1;
-    const end = Math.min(page * PAGE_SIZE, total);
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, total);
     return `${start}–${end} de ${total.toLocaleString("es-AR")}`;
-  }, [total, page]);
+  }, [total, page, pageSize]);
 
   const visibleIds = pageItems.map((o) => o.id);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
@@ -214,29 +241,52 @@ export default function OfertasView() {
 
       <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
         <span>{loading ? "Cargando…" : rangoResultados}</span>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-            >
-              Anterior
-            </Button>
-            <span>
-              Página {page} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-            >
-              Siguiente
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {total > 0 && (
+            <label className="flex items-center gap-1.5">
+              <span className="text-xs">Filas por página</span>
+              <Select
+                items={Object.fromEntries(PAGE_SIZES.map((n) => [String(n), String(n)]))}
+                value={String(pageSize)}
+                onValueChange={(v) => setPageSize(Number(v))}
+              >
+                <SelectTrigger size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZES.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Anterior
+              </Button>
+              <span>
+                Página {page} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                Siguiente
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {puedeEditar && selectedIds.size > 0 && (
@@ -271,44 +321,75 @@ export default function OfertasView() {
                 label="Marca"
                 value={columnFilters.marca}
                 onChange={(v) => setColumnFilter("marca", v)}
+                sortDirection={sort?.campo === "marca" ? sort.order : null}
+                onSortToggle={() => toggleSort("marca")}
               />
               <ColumnFilterHeader
                 label="N° oferta"
                 value={columnFilters.numeroOferta}
                 onChange={(v) => setColumnFilter("numeroOferta", v)}
+                sortDirection={sort?.campo === "numeroOferta" ? sort.order : null}
+                onSortToggle={() => toggleSort("numeroOferta")}
               />
               <ColumnFilterHeader
                 label="SKU proveedor"
                 value={columnFilters.sku}
                 onChange={(v) => setColumnFilter("sku", v)}
+                sortDirection={sort?.campo === "sku" ? sort.order : null}
+                onSortToggle={() => toggleSort("sku")}
               />
               <ColumnFilterHeader
                 label="Descripción"
                 value={columnFilters.descripcion}
                 onChange={(v) => setColumnFilter("descripcion", v)}
+                sortDirection={sort?.campo === "descripcion" ? sort.order : null}
+                onSortToggle={() => toggleSort("descripcion")}
               />
               <ColumnFilterHeader
                 label="Desde cant."
                 value={columnFilters.desdeCantidad}
                 onChange={(v) => setColumnFilter("desdeCantidad", v)}
                 align="right"
+                sortDirection={sort?.campo === "desdeCantidad" ? sort.order : null}
+                onSortToggle={() => toggleSort("desdeCantidad")}
               />
               <ColumnFilterHeader
                 label="Descuento"
-                value={columnFilters.descuento}
-                onChange={(v) => setColumnFilter("descuento", v)}
+                value=""
+                onChange={() => {}}
+                rangeValue={{ min: columnFilters.descuentoPctMin, max: columnFilters.descuentoPctMax }}
+                onRangeChange={(min, max) =>
+                  setColumnFilters((prev) => ({ ...prev, descuentoPctMin: min, descuentoPctMax: max }))
+                }
                 align="right"
+                sortDirection={sort?.campo === "descuentoPct" ? sort.order : null}
+                onSortToggle={() => toggleSort("descuentoPct")}
               />
               <ColumnFilterHeader
                 label="Precio unitario"
-                value={columnFilters.precioUnitario}
-                onChange={(v) => setColumnFilter("precioUnitario", v)}
+                value=""
+                onChange={() => {}}
+                rangeValue={{
+                  min: columnFilters.precioUnitarioMin,
+                  max: columnFilters.precioUnitarioMax,
+                }}
+                onRangeChange={(min, max) =>
+                  setColumnFilters((prev) => ({
+                    ...prev,
+                    precioUnitarioMin: min,
+                    precioUnitarioMax: max,
+                  }))
+                }
                 align="right"
+                sortDirection={sort?.campo === "precioUnitario" ? sort.order : null}
+                onSortToggle={() => toggleSort("precioUnitario")}
               />
               <ColumnFilterHeader
                 label="Vigencia"
                 value={columnFilters.fechaOferta}
                 onChange={(v) => setColumnFilter("fechaOferta", v)}
+                sortDirection={sort?.campo === "fechaOferta" ? sort.order : null}
+                onSortToggle={() => toggleSort("fechaOferta")}
               />
               <ColumnFilterHeader
                 label="Válida hasta"
@@ -317,6 +398,8 @@ export default function OfertasView() {
                 options={VIGENCIA_OPTIONS}
                 dateValue={columnFilters.fechaHasta}
                 onDateChange={(v) => setColumnFilter("fechaHasta", v)}
+                sortDirection={sort?.campo === "fechaHasta" ? sort.order : null}
+                onSortToggle={() => toggleSort("fechaHasta")}
               />
             </TableRow>
           </TableHeader>

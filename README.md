@@ -47,8 +47,11 @@ token.
 
 ## Funcionalidades
 
-- **Catálogo** (`/`, pestaña "Catálogo"): filtros por Proveedor, Marca, Sección (combobox con búsqueda, +490 valores), Vigencia, IVA y rango de precio neto.
-- **Ofertas** (pestaña "Ofertas"): filtros por Marca, Fecha de oferta, rango de descuento y rango de precio unitario. La columna "Válida hasta" muestra la fecha de vencimiento de cada oferta (o "Hasta agotar stock" si no tiene) y su filtro combina un select categórico (Todas / Hasta agotar stock / Con fecha de vencimiento — `f_vigencia` en el backend, porque `fechaHasta: null` no se puede filtrar con texto) con un date picker de fecha exacta (`f_fechaHasta`). Ambos modos conviven en `ColumnFilterHeader.tsx` vía las props opcionales `options` y `dateValue`/`onDateChange`.
+- **Catálogo** (`/`, pestaña "Catálogo"): filtro por columna en cada encabezado — texto libre en Proveedor/Marca/SKU/Descripción/Vigencia, combobox con búsqueda en Sección (los valores salen de `GET /api/productos/secciones`), rango Mín/Máx en Precio neto y Precio c/IVA, igualdad exacta en IVA %.
+- **Ofertas** (pestaña "Ofertas"): mismos filtros por columna (rango Mín/Máx en Descuento y Precio unitario). La columna "Válida hasta" muestra la fecha de vencimiento de cada oferta (o "Hasta agotar stock" si no tiene) y su filtro combina un select categórico (Todas / Hasta agotar stock / Con fecha de vencimiento — `f_vigencia` en el backend, porque `fechaHasta: null` no se puede filtrar con texto) con un date picker de fecha exacta (`f_fechaHasta`).
+- **Ordenar por columna** (ambas pestañas): click en el nombre de la columna cicla ascendente → descendente → orden por defecto (última carga primero). El orden lo aplica el backend (`?sort=&order=`, whitelist por tabla — ver `../backend/README.md`).
+- **Filas por página**: selector 50/100/200 junto al contador de resultados, en ambas pestañas.
+- Todos los modos de filtro (texto, select, combobox, rango, fecha) conviven en `ColumnFilterHeader.tsx` vía props opcionales (`options`, `searchOptions`, `rangeValue`/`onRangeChange`, `dateValue`/`onDateChange`, `sortDirection`/`onSortToggle`).
 - Todos los filtros son **combinables** entre sí con lógica AND (cada uno reduce más el resultado sobre el anterior), incluyendo el buscador de texto libre.
 - El buscador compara sobre **todos los campos** de cada fila (no solo SKU/descripción) y es **insensible a acentos**, sin modificar el texto original que se muestra en pantalla.
 - Las coincidencias se **resaltan** en cualquier columna donde aparezcan.
