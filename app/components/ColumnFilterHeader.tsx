@@ -85,8 +85,12 @@ export default function ColumnFilterHeader({
     <TableHead className={align === "right" ? "text-right" : undefined}>
       <div
         className={cn(
+          // justify-end (no flex-row-reverse): empuja el grupo al borde
+          // derecho de la celda sin invertir el orden de los ítems — el
+          // ícono de filtro siempre queda a la derecha del de orden, tanto
+          // en columnas alineadas a la izquierda como a la derecha.
           "flex items-center gap-1",
-          align === "right" && "flex-row-reverse"
+          align === "right" && "justify-end"
         )}
       >
         {onSortToggle ? (
