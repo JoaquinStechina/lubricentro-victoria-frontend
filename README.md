@@ -78,6 +78,16 @@ token.
   ofertas — ver `../backend/README.md`) calculadas por el backend al abrir la pantalla; son solo
   informativas, no bloquean la confirmación. Requiere el backend corriendo
   (`NEXT_PUBLIC_API_URL`, default `http://localhost:4000`, ver `.env.local`).
+  - **Mapeo de columnas muchos-a-uno**: se puede asignar el mismo campo destino (ej.
+    "Descripción") a dos o más columnas de origen — los valores se concatenan con un espacio, en
+    el orden en que aparecen las columnas en el archivo, salteando vacíos
+    (`applyMappingPreview.ts` / `applyMappingPreviewOfertas.ts` en el frontend,
+    `applyMapping`/`applyMappingOfertas` en `../backend`, mismo criterio en los dos lados).
+  - **"Hasta agotar stock"** (solo tipo "Oferta"): switch en `UploadForm.tsx`, debajo del
+    selector Catálogo/Oferta. Si está activo, se manda `sinFechaLimite: true` al crear la carga y
+    la IA no intenta inferir una fecha de vencimiento del documento (evita alucinaciones) —
+    `metadataOferta.fecha_hasta` queda `null` directamente. Ver `../backend/README.md`
+    (`Carga.sinFechaLimite`) y `../contexto.md` (sección "Vigencia de catálogo y ofertas").
 - **Catálogo y ofertas vigentes** (`/cargas/gestion`): pantalla mínima, también contra el backend
   real, para ver el precio actual por SKU (`ProductoPrecio.vigente`) y las ofertas activas, y
   cerrar/reactivar una oferta ("marcar agotada") cuando se acaba el stock — ver `../contexto.md`,
