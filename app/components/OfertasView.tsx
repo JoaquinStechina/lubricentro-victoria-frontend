@@ -5,6 +5,7 @@ import { apiFetch } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
+import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
 import EditarOfertaDialog from "@/app/components/ofertas/EditarOfertaDialog";
 import BulkEditarOfertaDialog from "@/app/components/ofertas/BulkEditarOfertaDialog";
@@ -163,6 +164,21 @@ export default function OfertasView() {
     setColumnFilters(EMPTY_COLUMN_FILTERS);
   }
 
+  // Mismos filtros/orden que la tabla (el GET de ofertas no pagina en el
+  // backend, así que no hay page/pageSize que excluir).
+  function buildExportParams() {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    for (const [key, value] of Object.entries(debouncedColumnFilters)) {
+      if (value) params.set(`f_${key}`, value);
+    }
+    if (sort) {
+      params.set("sort", sort.campo);
+      params.set("order", sort.order);
+    }
+    return params;
+  }
+
   const total = allOfertas?.length ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const pageItems = useMemo(
@@ -236,6 +252,11 @@ export default function OfertasView() {
               Limpiar filtros
             </Button>
           )}
+          <ExportarButton
+            exportPath="/api/ofertas/export"
+            getParams={buildExportParams}
+            nombreArchivo="ofertas"
+          />
         </div>
       </section>
 

@@ -5,6 +5,7 @@ import { apiFetch } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
+import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
 import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
 import BulkEditarProductoDialog from "@/app/components/catalogo/BulkEditarProductoDialog";
@@ -177,6 +178,21 @@ export default function CatalogoView() {
     setColumnFilters(EMPTY_COLUMN_FILTERS);
   }
 
+  // Mismos filtros/orden que la tabla, sin page/pageSize: el export baja el
+  // resultado completo (ver GET /api/productos/export).
+  function buildExportParams() {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    for (const [key, value] of Object.entries(debouncedColumnFilters)) {
+      if (value) params.set(`f_${key}`, value);
+    }
+    if (sort) {
+      params.set("sort", sort.campo);
+      params.set("order", sort.order);
+    }
+    return params;
+  }
+
   const rangoResultados = useMemo(() => {
     if (!data || data.total === 0) return "0 resultados";
     const start = (data.page - 1) * data.pageSize + 1;
@@ -251,6 +267,11 @@ export default function CatalogoView() {
               Limpiar filtros
             </Button>
           )}
+          <ExportarButton
+            exportPath="/api/productos/export"
+            getParams={buildExportParams}
+            nombreArchivo="catalogo"
+          />
         </div>
       </section>
 
