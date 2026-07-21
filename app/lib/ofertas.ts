@@ -32,7 +32,9 @@ export type OfertaColumnKey =
   | "desdeCantidad"
   | "descuento"
   | "precioUnitario"
-  | "fechaOferta";
+  | "fechaOferta"
+  | "vigencia"
+  | "fechaHasta";
 
 // Campos que puede tocar PATCH /api/ofertas/:id (edición de una fila). No
 // incluye `activa`: eso solo lo tocan POST /cerrar y /reactivar.

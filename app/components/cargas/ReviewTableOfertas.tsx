@@ -44,12 +44,22 @@ const MAPPING_SELECT_ITEMS: Record<string, string> = {
 // Los campos "de todo el archivo" (ver docs/plan-ofertas.md, punto 2):
 // auto-detectados por IA en metadataOferta, editables una sola vez acá
 // arriba en vez de por fila.
-const METADATA_FIELDS: { key: keyof OfertaMetadata; label: string; placeholder?: string }[] = [
+const METADATA_FIELDS: {
+  key: keyof OfertaMetadata;
+  label: string;
+  placeholder?: string;
+  type?: string;
+}[] = [
   { key: "marca", label: "Marca" },
   { key: "numero_oferta", label: "N° oferta" },
-  { key: "fecha_oferta", label: "Fecha oferta" },
-  { key: "hora_oferta", label: "Hora oferta" },
-  { key: "fecha_hasta", label: "Válida hasta", placeholder: "vacío = hasta agotar stock" },
+  { key: "fecha_oferta", label: "Fecha oferta", type: "date" },
+  { key: "hora_oferta", label: "Hora oferta", type: "time" },
+  {
+    key: "fecha_hasta",
+    label: "Válida hasta",
+    placeholder: "vacío = hasta agotar stock",
+    type: "date",
+  },
 ];
 
 type ReviewTableOfertasProps = {
@@ -195,10 +205,11 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
           Datos del archivo (aplican a toda la oferta)
         </h2>
         <div className="flex flex-wrap gap-3">
-          {METADATA_FIELDS.map(({ key, label, placeholder }) => (
+          {METADATA_FIELDS.map(({ key, label, placeholder, type }) => (
             <div key={key} className="flex flex-col gap-1">
               <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
               <Input
+                type={type ?? "text"}
                 value={metadata[key] ?? ""}
                 onChange={(e) => handleMetadataChange(key, e.target.value)}
                 className="h-8 w-40 text-sm"
@@ -321,6 +332,13 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
                           onChange={(e) => handleCellChange(idx, field, e.target.value)}
                           disabled={isExcluded}
                           className="h-7 w-32 text-xs"
+                          placeholder={
+                            field === "desde_cantidad"
+                              ? "vacío = 1"
+                              : field === "descuento_pct"
+                                ? "vacío = 0"
+                                : undefined
+                          }
                           inputMode={
                             field === "precio_unitario" ||
                             field === "descuento_pct" ||

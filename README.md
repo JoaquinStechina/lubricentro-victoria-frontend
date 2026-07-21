@@ -48,7 +48,7 @@ token.
 ## Funcionalidades
 
 - **Catálogo** (`/`, pestaña "Catálogo"): filtros por Proveedor, Marca, Sección (combobox con búsqueda, +490 valores), Vigencia, IVA y rango de precio neto.
-- **Ofertas** (pestaña "Ofertas"): filtros por Marca, Fecha de oferta, rango de descuento y rango de precio unitario.
+- **Ofertas** (pestaña "Ofertas"): filtros por Marca, Fecha de oferta, rango de descuento y rango de precio unitario. La columna "Válida hasta" muestra la fecha de vencimiento de cada oferta (o "Hasta agotar stock" si no tiene) y su filtro combina un select categórico (Todas / Hasta agotar stock / Con fecha de vencimiento — `f_vigencia` en el backend, porque `fechaHasta: null` no se puede filtrar con texto) con un date picker de fecha exacta (`f_fechaHasta`). Ambos modos conviven en `ColumnFilterHeader.tsx` vía las props opcionales `options` y `dateValue`/`onDateChange`.
 - Todos los filtros son **combinables** entre sí con lógica AND (cada uno reduce más el resultado sobre el anterior), incluyendo el buscador de texto libre.
 - El buscador compara sobre **todos los campos** de cada fila (no solo SKU/descripción) y es **insensible a acentos**, sin modificar el texto original que se muestra en pantalla.
 - Las coincidencias se **resaltan** en cualquier columna donde aparezcan.
@@ -88,6 +88,12 @@ token.
     la IA no intenta inferir una fecha de vencimiento del documento (evita alucinaciones) —
     `metadataOferta.fecha_hasta` queda `null` directamente. Ver `../backend/README.md`
     (`Carga.sinFechaLimite`) y `../contexto.md` (sección "Vigencia de catálogo y ofertas").
+  - En la revisión de ofertas (`ReviewTableOfertas.tsx`), los campos de archivo "Fecha oferta",
+    "Hora oferta" y "Válida hasta" usan inputs nativos `type="date"`/`type="time"` (calendario y
+    reloj del navegador; el backend ya genera esos valores en `YYYY-MM-DD`/`HH:MM`, así que son
+    compatibles sin conversión). "Válida hasta" puede quedar vacío = hasta agotar stock. En la
+    tabla de filas, "Desde cantidad" y "Descuento %" son opcionales: si quedan vacíos, el backend
+    infiere `1` y `0` al confirmar (placeholders "vacío = 1" / "vacío = 0" en la celda).
 - **Catálogo y ofertas vigentes** (`/cargas/gestion`): pantalla mínima, también contra el backend
   real, para ver el precio actual por SKU (`ProductoPrecio.vigente`) y las ofertas activas, y
   cerrar/reactivar una oferta ("marcar agotada") cuando se acaba el stock — ver `../contexto.md`,

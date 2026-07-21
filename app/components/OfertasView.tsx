@@ -37,7 +37,17 @@ const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
   descuento: "",
   precioUnitario: "",
   fechaOferta: "",
+  vigencia: "",
+  fechaHasta: "",
 };
+
+// "sin_fecha"/"con_fecha" en vez de comparar contra un valor de texto: null
+// en fechaHasta no se puede buscar con un filtro "contains" (ver
+// backend/src/routes/ofertas.ts f_vigencia).
+const VIGENCIA_OPTIONS = [
+  { value: "sin_fecha", label: "Hasta agotar stock" },
+  { value: "con_fecha", label: "Con fecha de vencimiento" },
+];
 
 const currencyFormatter = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -175,7 +185,7 @@ export default function OfertasView() {
     setSelectedIds(new Set());
   }
 
-  const colSpan = puedeEditar ? 9 : 8;
+  const colSpan = puedeEditar ? 10 : 9;
 
   return (
     <>
@@ -300,6 +310,14 @@ export default function OfertasView() {
                 value={columnFilters.fechaOferta}
                 onChange={(v) => setColumnFilter("fechaOferta", v)}
               />
+              <ColumnFilterHeader
+                label="Válida hasta"
+                value={columnFilters.vigencia}
+                onChange={(v) => setColumnFilter("vigencia", v)}
+                options={VIGENCIA_OPTIONS}
+                dateValue={columnFilters.fechaHasta}
+                onDateChange={(v) => setColumnFilter("fechaHasta", v)}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -355,6 +373,11 @@ export default function OfertasView() {
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <HighlightText text={oferta.fechaOferta} query={debouncedSearch} />
+                    </TableCell>
+                    <TableCell className="text-zinc-700 dark:text-zinc-300">
+                      {oferta.fechaHasta ?? (
+                        <span className="text-zinc-500 dark:text-zinc-500">Hasta agotar stock</span>
+                      )}
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
