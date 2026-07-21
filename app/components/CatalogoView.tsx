@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/app/lib/api";
+import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
@@ -10,10 +10,12 @@ import HighlightText from "@/app/components/HighlightText";
 import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
 import BulkEditarProductoDialog from "@/app/components/catalogo/BulkEditarProductoDialog";
 import EliminarProductosDialog from "@/app/components/catalogo/EliminarProductosDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -75,6 +77,8 @@ export default function CatalogoView() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
   const [sort, setSort] = useState<SortState>(null);
+  const [verEliminados, setVerEliminados] = useState(false);
+  const [restaurando, setRestaurando] = useState(false);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -129,7 +133,7 @@ export default function CatalogoView() {
   // Cualquier cambio de filtro/orden/tamaño vuelve a la página 1 (ajuste de
   // estado durante el render, ver
   // https://react.dev/learn/you-might-not-need-an-effect).
-  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}`;
+  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}|${verEliminados}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -147,6 +151,7 @@ export default function CatalogoView() {
       params.set("sort", sort.campo);
       params.set("order", sort.order);
     }
+    if (verEliminados) params.set("incluirEliminados", "true");
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
 
@@ -168,7 +173,7 @@ export default function CatalogoView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, sort, page, pageSize, reloadTick]);
+  }, [debouncedSearch, debouncedColumnFilters, sort, verEliminados, page, pageSize, reloadTick]);
 
   const hayFiltrosActivos =
     search || Object.values(columnFilters).some((v) => v);
@@ -190,7 +195,19 @@ export default function CatalogoView() {
       params.set("sort", sort.campo);
       params.set("order", sort.order);
     }
+    if (verEliminados) params.set("incluirEliminados", "true");
     return params;
+  }
+
+  async function restaurarSeleccion() {
+    setRestaurando(true);
+    try {
+      await apiFetch(`/api/productos/restaurar`, apiJsonInit({ ids: [...selectedIds] }));
+      setSelectedIds(new Set());
+      setReloadTick((t) => t + 1);
+    } finally {
+      setRestaurando(false);
+    }
   }
 
   const rangoResultados = useMemo(() => {
@@ -273,6 +290,14 @@ export default function CatalogoView() {
             nombreArchivo="catalogo"
           />
         </div>
+        {puedeEditar && (
+          <div className="flex items-center gap-5 text-sm">
+            <label className="flex cursor-pointer items-center gap-2">
+              <Switch checked={verEliminados} onCheckedChange={setVerEliminados} />
+              <span className="text-zinc-700 dark:text-zinc-300">Ver eliminados (papelera)</span>
+            </label>
+          </div>
+        )}
       </section>
 
       <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
@@ -330,12 +355,21 @@ export default function CatalogoView() {
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
           </span>
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            Editar
-          </Button>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-            Eliminar
-          </Button>
+          {verEliminados ? (
+            // En la papelera lo único que se puede hacer es restaurar.
+            <Button variant="outline" size="sm" onClick={restaurarSeleccion} disabled={restaurando}>
+              {restaurando ? "Restaurando…" : "Restaurar"}
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                Editar
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+                Eliminar
+              </Button>
+            </>
+          )}
         </div>
       )}
 
@@ -458,7 +492,10 @@ export default function CatalogoView() {
                     onClick={() =>
                       hasRawData && setExpandedRow(isExpanded ? null : producto.id)
                     }
-                    className={hasRawData ? "cursor-pointer" : ""}
+                    className={
+                      (hasRawData ? "cursor-pointer " : "") +
+                      (producto.eliminado ? "opacity-60" : "")
+                    }
                   >
                     {puedeEditar && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -470,7 +507,10 @@ export default function CatalogoView() {
                       </TableCell>
                     )}
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={producto.proveedor?.nombre ?? "—"} query={debouncedSearch} />
+                      <span className="flex items-center gap-1.5">
+                        <HighlightText text={producto.proveedor?.nombre ?? "—"} query={debouncedSearch} />
+                        {producto.eliminado && <Badge variant="destructive">Eliminado</Badge>}
+                      </span>
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <HighlightText text={producto.marca ?? "—"} query={debouncedSearch} />

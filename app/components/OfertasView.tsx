@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/app/lib/api";
+import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
@@ -10,10 +10,12 @@ import HighlightText from "@/app/components/HighlightText";
 import EditarOfertaDialog from "@/app/components/ofertas/EditarOfertaDialog";
 import BulkEditarOfertaDialog from "@/app/components/ofertas/BulkEditarOfertaDialog";
 import EliminarOfertasDialog from "@/app/components/ofertas/EliminarOfertasDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -70,6 +72,26 @@ function formatPrecio(valor: number) {
   return currencyFormatter.format(valor);
 }
 
+// Fecha local en YYYY-MM-DD (en-CA da ese formato) — no usar toISOString(),
+// que es UTC y en Argentina marcaría como vencida una oferta que todavía
+// vence "hoy". Mismo criterio que hoyLocalISO() en el backend.
+function hoyLocalISO(): string {
+  return new Intl.DateTimeFormat("en-CA").format(new Date());
+}
+
+// Mismo cálculo que el backend (buildOfertasWhere / export): "Cerrada" es
+// el cierre manual, "Vencida" el vencimiento por fecha.
+function estadoOferta(oferta: Oferta, hoy: string): {
+  label: string;
+  variant: "secondary" | "outline" | "destructive";
+} {
+  if (!oferta.activa) return { label: "Cerrada", variant: "outline" };
+  if (oferta.fechaHasta && oferta.fechaHasta < hoy) {
+    return { label: "Vencida", variant: "destructive" };
+  }
+  return { label: "Activa", variant: "secondary" };
+}
+
 // El backend de ofertas no pagina (devuelve la lista completa filtrada por
 // activa/eliminado); la paginación de 50 en 50 se hace acá en memoria, igual
 // que hacía el prototipo JSON antes de migrar a la API real.
@@ -82,6 +104,8 @@ export default function OfertasView() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
   const [sort, setSort] = useState<SortState>(null);
+  const [incluirCerradas, setIncluirCerradas] = useState(false);
+  const [verEliminadas, setVerEliminadas] = useState(false);
   const [allOfertas, setAllOfertas] = useState<Oferta[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -117,7 +141,7 @@ export default function OfertasView() {
     });
   }
 
-  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}`;
+  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}|${incluirCerradas}|${verEliminadas}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -135,6 +159,8 @@ export default function OfertasView() {
       params.set("sort", sort.campo);
       params.set("order", sort.order);
     }
+    if (incluirCerradas) params.set("incluirCerradas", "true");
+    if (verEliminadas) params.set("incluirEliminados", "true");
 
     async function load() {
       setLoading(true);
@@ -154,7 +180,7 @@ export default function OfertasView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, sort, reloadTick]);
+  }, [debouncedSearch, debouncedColumnFilters, sort, incluirCerradas, verEliminadas, reloadTick]);
 
   const hayFiltrosActivos =
     search || Object.values(columnFilters).some((v) => v);
@@ -176,6 +202,8 @@ export default function OfertasView() {
       params.set("sort", sort.campo);
       params.set("order", sort.order);
     }
+    if (incluirCerradas) params.set("incluirCerradas", "true");
+    if (verEliminadas) params.set("incluirEliminados", "true");
     return params;
   }
 
@@ -228,7 +256,50 @@ export default function OfertasView() {
     setSelectedIds(new Set());
   }
 
-  const colSpan = puedeEditar ? 10 : 9;
+  const seleccionadas = allOfertas?.filter((o) => selectedIds.has(o.id)) ?? [];
+  const paraCerrar = seleccionadas.filter((o) => o.activa);
+  const paraReactivar = seleccionadas.filter((o) => !o.activa);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
+
+  // Cerrar/reactivar opera por (proveedorId, numeroOferta, skuProveedor):
+  // afecta TODOS los tramos de cantidad de ese SKU en esa oferta, incluso
+  // filas no seleccionadas — "se acabó el stock" es un hecho del producto,
+  // no de un tramo (ver backend POST /api/ofertas/cerrar).
+  async function cambiarEstadoSeleccion(accion: "cerrar" | "reactivar") {
+    const filas = accion === "cerrar" ? paraCerrar : paraReactivar;
+    const porSku = new Map<string, { proveedorId: number; numeroOferta: number; skuProveedor: string }>();
+    for (const o of filas) {
+      porSku.set(`${o.proveedorId}|${o.numeroOferta}|${o.skuProveedor}`, {
+        proveedorId: o.proveedorId,
+        numeroOferta: o.numeroOferta,
+        skuProveedor: o.skuProveedor,
+      });
+    }
+    setCambiandoEstado(true);
+    try {
+      for (const body of porSku.values()) {
+        await apiFetch(`/api/ofertas/${accion}`, apiJsonInit(body));
+      }
+      setSelectedIds(new Set());
+      setReloadTick((t) => t + 1);
+    } finally {
+      setCambiandoEstado(false);
+    }
+  }
+
+  async function restaurarSeleccion() {
+    setCambiandoEstado(true);
+    try {
+      await apiFetch(`/api/ofertas/restaurar`, apiJsonInit({ ids: [...selectedIds] }));
+      setSelectedIds(new Set());
+      setReloadTick((t) => t + 1);
+    } finally {
+      setCambiandoEstado(false);
+    }
+  }
+
+  const colSpan = puedeEditar ? 11 : 10;
+  const hoy = hoyLocalISO();
 
   return (
     <>
@@ -257,6 +328,18 @@ export default function OfertasView() {
             getParams={buildExportParams}
             nombreArchivo="ofertas"
           />
+        </div>
+        <div className="flex items-center gap-5 text-sm">
+          <label className="flex cursor-pointer items-center gap-2">
+            <Switch checked={incluirCerradas} onCheckedChange={setIncluirCerradas} />
+            <span className="text-zinc-700 dark:text-zinc-300">Ver cerradas/vencidas</span>
+          </label>
+          {puedeEditar && (
+            <label className="flex cursor-pointer items-center gap-2">
+              <Switch checked={verEliminadas} onCheckedChange={setVerEliminadas} />
+              <span className="text-zinc-700 dark:text-zinc-300">Ver eliminadas (papelera)</span>
+            </label>
+          )}
         </div>
       </section>
 
@@ -311,16 +394,51 @@ export default function OfertasView() {
       </div>
 
       {puedeEditar && selectedIds.size > 0 && (
-        <div className="mb-2 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
           </span>
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-            Editar
-          </Button>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-            Eliminar
-          </Button>
+          {verEliminadas ? (
+            // En la papelera lo único que se puede hacer es restaurar.
+            <Button variant="outline" size="sm" onClick={restaurarSeleccion} disabled={cambiandoEstado}>
+              {cambiandoEstado ? "Restaurando…" : "Restaurar"}
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                Editar
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+                Eliminar
+              </Button>
+              {paraCerrar.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => cambiarEstadoSeleccion("cerrar")}
+                  disabled={cambiandoEstado}
+                  title="Cierra todos los tramos de cantidad de ese SKU en esa oferta, incluso los no seleccionados"
+                >
+                  Marcar agotada
+                </Button>
+              )}
+              {paraReactivar.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => cambiarEstadoSeleccion("reactivar")}
+                  disabled={cambiandoEstado}
+                >
+                  Reactivar
+                </Button>
+              )}
+              {paraCerrar.length > 0 && (
+                <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                  Cerrar una oferta afecta todos los tramos de ese SKU.
+                </span>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -422,6 +540,7 @@ export default function OfertasView() {
                 sortDirection={sort?.campo === "fechaHasta" ? sort.order : null}
                 onSortToggle={() => toggleSort("fechaHasta")}
               />
+              <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -443,7 +562,7 @@ export default function OfertasView() {
                     onClick={() =>
                       setExpandedRow(isExpanded ? null : oferta.id)
                     }
-                    className="cursor-pointer"
+                    className={oferta.eliminado ? "cursor-pointer opacity-60" : "cursor-pointer"}
                   >
                     {puedeEditar && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -482,6 +601,15 @@ export default function OfertasView() {
                       {oferta.fechaHasta ?? (
                         <span className="text-zinc-500 dark:text-zinc-500">Hasta agotar stock</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-1.5">
+                        {(() => {
+                          const estado = estadoOferta(oferta, hoy);
+                          return <Badge variant={estado.variant}>{estado.label}</Badge>;
+                        })()}
+                        {oferta.eliminado && <Badge variant="destructive">Eliminada</Badge>}
+                      </span>
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
