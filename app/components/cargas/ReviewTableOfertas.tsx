@@ -212,6 +212,12 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
           falta antes de confirmar. Solo se usan para las filas donde el dato no viene de una
           columna mapeada.
         </p>
+        {carga.sinFechaLimite && (
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+            Se marcó como <strong>&quot;Hasta agotar stock&quot;</strong> al subir el archivo, por
+            eso &quot;Válida hasta&quot; quedó vacío.
+          </p>
+        )}
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">

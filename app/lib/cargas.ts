@@ -140,6 +140,9 @@ export type Carga = {
   rutaArchivo: string;
   tipoArchivo: TipoArchivo;
   tipoDatos: TipoDatos;
+  // Solo relevante si tipoDatos = "oferta": el usuario marcó al subir el
+  // archivo que la oferta no tiene fecha de cierre ("hasta agotar stock").
+  sinFechaLimite: boolean;
   estado: CargaEstado;
   mensajeError: string | null;
   filasExtraidas: { headers: string[]; rows: ExtractedRow[] } | null;

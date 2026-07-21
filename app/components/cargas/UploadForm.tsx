@@ -21,6 +21,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 
 type UploadFormProps = {
   onUploaded: (carga: Carga) => void;
@@ -28,6 +29,7 @@ type UploadFormProps = {
 
 export default function UploadForm({ onUploaded }: UploadFormProps) {
   const [tipoDatos, setTipoDatos] = useState<TipoDatos>("catalogo");
+  const [sinFechaLimite, setSinFechaLimite] = useState(false);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [proveedorNombre, setProveedorNombre] = useState("");
   const [proveedorOpen, setProveedorOpen] = useState(false);
@@ -85,9 +87,14 @@ export default function UploadForm({ onUploaded }: UploadFormProps) {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("tipoDatos", tipoDatos);
+      if (tipoDatos === "oferta") formData.append("sinFechaLimite", String(sinFechaLimite));
       if (proveedorNombre.trim()) formData.append("proveedor", proveedorNombre.trim());
 
-      const res = await fetch(`${API_URL}/api/uploads`, { method: "POST", body: formData });
+      const res = await fetch(`${API_URL}/api/uploads`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error ?? `Error ${res.status} subiendo el archivo.`);
@@ -123,6 +130,23 @@ export default function UploadForm({ onUploaded }: UploadFormProps) {
           ))}
         </div>
       </div>
+
+      {tipoDatos === "oferta" && (
+        <label
+          htmlFor="sin-fecha-limite"
+          className="flex w-fit cursor-pointer items-center gap-2 text-sm"
+        >
+          <Switch
+            id="sin-fecha-limite"
+            checked={sinFechaLimite}
+            onCheckedChange={setSinFechaLimite}
+          />
+          <span className="text-zinc-700 dark:text-zinc-300">Hasta agotar stock</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-500">
+            (sin fecha de vencimiento — no le pedimos a la IA que busque una)
+          </span>
+        </label>
+      )}
 
       <div className="flex flex-col gap-1 text-sm">
         <span className="text-zinc-600 dark:text-zinc-400">Proveedor</span>
