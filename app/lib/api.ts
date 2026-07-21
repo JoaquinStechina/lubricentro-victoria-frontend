@@ -18,6 +18,14 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return res.json() as Promise<T>;
 }
 
+// Arma la URL absoluta de una imagen servida por el backend (imagenUrl es
+// una ruta relativa, ej. "/uploads/imagenes/xxx.jpg", ver GET estático en
+// backend/src/server.ts). null/"" -> undefined, para poder pasarlo directo
+// a <img src>.
+export function imagenSrc(path: string | null): string | undefined {
+  return path ? `${API_URL}${path}` : undefined;
+}
+
 export function apiJsonInit(body: unknown, method: "POST" | "PATCH" = "POST"): RequestInit {
   return {
     method,

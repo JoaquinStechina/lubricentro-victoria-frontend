@@ -16,6 +16,7 @@ export type Oferta = {
   fechaOferta: string;
   horaOferta: string;
   fechaHasta: string | null;
+  imagenUrl: string | null;
   activa: boolean;
   eliminado: boolean;
   archivoOrigen: string;

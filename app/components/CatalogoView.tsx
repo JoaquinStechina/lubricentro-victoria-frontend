@@ -1,14 +1,15 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { History } from "lucide-react";
-import { apiFetch, apiJsonInit } from "@/app/lib/api";
+import { History, ImageIcon, Plus } from "lucide-react";
+import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
 import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
+import NuevoProductoDialog from "@/app/components/catalogo/NuevoProductoDialog";
 import BulkEditarProductoDialog from "@/app/components/catalogo/BulkEditarProductoDialog";
 import EliminarProductosDialog from "@/app/components/catalogo/EliminarProductosDialog";
 import HistorialProductoDialog from "@/app/components/catalogo/HistorialProductoDialog";
@@ -104,6 +105,7 @@ export default function CatalogoView() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [nuevoOpen, setNuevoOpen] = useState(false);
   const [historialProducto, setHistorialProducto] = useState<Producto | null>(null);
 
   // Debounce los campos de texto para no disparar un fetch por cada tecla.
@@ -245,8 +247,22 @@ export default function CatalogoView() {
     );
     setSelectedIds(new Set());
   }
+  // A diferencia de handleSingleUpdated, no toca selectedIds: se usa para la
+  // subida/borrado de imagen dentro del diálogo de edición, una acción
+  // independiente del submit del form que no debería cerrar el diálogo (si
+  // limpiara la selección, selectedProducto pasaría a null y desmontaría el
+  // diálogo a mitad de la edición).
+  function handleImagenActualizada(actualizado: Producto) {
+    setData((prev) =>
+      prev ? { ...prev, items: prev.items.map((p) => (p.id === actualizado.id ? actualizado : p)) } : prev
+    );
+  }
   function handleBulkUpdated() {
     setSelectedIds(new Set());
+    setReloadTick((t) => t + 1);
+  }
+  function handleCreated() {
+    setPage(1);
     setReloadTick((t) => t + 1);
   }
   function handleDeleted(ids: number[]) {
@@ -263,7 +279,7 @@ export default function CatalogoView() {
     setSelectedIds(new Set());
   }
 
-  const colSpan = puedeEditar ? 11 : 10;
+  const colSpan = puedeEditar ? 12 : 11;
 
   return (
     <>
@@ -292,6 +308,12 @@ export default function CatalogoView() {
             getParams={buildExportParams}
             nombreArchivo="catalogo"
           />
+          {puedeEditar && (
+            <Button onClick={() => setNuevoOpen(true)}>
+              <Plus className="size-3.5" />
+              Nuevo producto
+            </Button>
+          )}
         </div>
         {puedeEditar && (
           <div className="flex items-center gap-5 text-sm">
@@ -390,6 +412,7 @@ export default function CatalogoView() {
                   />
                 </TableHead>
               )}
+              <TableHead aria-label="Imagen" />
               <ColumnFilterHeader
                 label="Proveedor"
                 value={columnFilters.proveedor}
@@ -510,6 +533,20 @@ export default function CatalogoView() {
                         />
                       </TableCell>
                     )}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {producto.imagenUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imagenSrc(producto.imagenUrl)}
+                          alt=""
+                          className="size-8 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="flex size-8 items-center justify-center rounded bg-zinc-100 text-zinc-400 dark:bg-zinc-800">
+                          <ImageIcon className="size-3.5" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <span className="flex items-center gap-1.5">
                         <HighlightText text={producto.proveedor?.nombre ?? "—"} query={debouncedSearch} />
@@ -596,8 +633,10 @@ export default function CatalogoView() {
           open={editOpen}
           onOpenChange={setEditOpen}
           onUpdated={handleSingleUpdated}
+          onImagenUpdated={handleImagenActualizada}
         />
       )}
+      <NuevoProductoDialog open={nuevoOpen} onOpenChange={setNuevoOpen} onCreated={handleCreated} />
       {editOpen && !selectedProducto && selectedIds.size > 1 && (
         <BulkEditarProductoDialog
           ids={[...selectedIds]}

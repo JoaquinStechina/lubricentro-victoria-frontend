@@ -1,14 +1,15 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { History } from "lucide-react";
-import { apiFetch, apiJsonInit } from "@/app/lib/api";
+import { History, ImageIcon, Plus } from "lucide-react";
+import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
 import EditarOfertaDialog from "@/app/components/ofertas/EditarOfertaDialog";
+import NuevaOfertaDialog from "@/app/components/ofertas/NuevaOfertaDialog";
 import BulkEditarOfertaDialog from "@/app/components/ofertas/BulkEditarOfertaDialog";
 import EliminarOfertasDialog from "@/app/components/ofertas/EliminarOfertasDialog";
 import HistorialOfertaDialog from "@/app/components/ofertas/HistorialOfertaDialog";
@@ -35,7 +36,11 @@ import {
 } from "@/components/ui/table";
 
 type ApiResponse = {
-  ofertas: Oferta[];
+  items: Oferta[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };
 
 const PAGE_SIZES = [50, 100, 200] as const;
@@ -94,9 +99,8 @@ function estadoOferta(oferta: Oferta, hoy: string): {
   return { label: "Activa", variant: "secondary" };
 }
 
-// El backend de ofertas no pagina (devuelve la lista completa filtrada por
-// activa/eliminado); la paginación de 50 en 50 se hace acá en memoria, igual
-// que hacía el prototipo JSON antes de migrar a la API real.
+// Paginación server-side, mismo patrón que CatalogoView.tsx (antes traía
+// todo el resultado filtrado y paginaba en memoria).
 export default function OfertasView() {
   const session = useSession();
   const puedeEditar = session?.rol === "ADMINISTRADOR" || session?.rol === "SYSADMIN";
@@ -108,7 +112,7 @@ export default function OfertasView() {
   const [sort, setSort] = useState<SortState>(null);
   const [incluirCerradas, setIncluirCerradas] = useState(false);
   const [verEliminadas, setVerEliminadas] = useState(false);
-  const [allOfertas, setAllOfertas] = useState<Oferta[] | null>(null);
+  const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
@@ -116,6 +120,7 @@ export default function OfertasView() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [nuevoOpen, setNuevoOpen] = useState(false);
   const [historialOferta, setHistorialOferta] = useState<Oferta | null>(null);
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -164,13 +169,15 @@ export default function OfertasView() {
     }
     if (incluirCerradas) params.set("incluirCerradas", "true");
     if (verEliminadas) params.set("incluirEliminados", "true");
+    params.set("page", String(page));
+    params.set("pageSize", String(pageSize));
 
     async function load() {
       setLoading(true);
       try {
         const json = await apiFetch<ApiResponse>(`/api/ofertas?${params.toString()}`);
         if (active) {
-          setAllOfertas(json.ofertas);
+          setData(json);
           setExpandedRow(null);
           setSelectedIds(new Set());
         }
@@ -183,7 +190,7 @@ export default function OfertasView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, sort, incluirCerradas, verEliminadas, reloadTick]);
+  }, [debouncedSearch, debouncedColumnFilters, sort, incluirCerradas, verEliminadas, page, pageSize, reloadTick]);
 
   const hayFiltrosActivos =
     search || Object.values(columnFilters).some((v) => v);
@@ -210,19 +217,14 @@ export default function OfertasView() {
     return params;
   }
 
-  const total = allOfertas?.length ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const pageItems = useMemo(
-    () => (allOfertas ?? []).slice((page - 1) * pageSize, page * pageSize),
-    [allOfertas, page, pageSize]
-  );
+  const pageItems = data?.items ?? [];
 
   const rangoResultados = useMemo(() => {
-    if (total === 0) return "0 resultados";
-    const start = (page - 1) * pageSize + 1;
-    const end = Math.min(page * pageSize, total);
-    return `${start}–${end} de ${total.toLocaleString("es-AR")}`;
-  }, [total, page, pageSize]);
+    if (!data || data.total === 0) return "0 resultados";
+    const start = (data.page - 1) * data.pageSize + 1;
+    const end = Math.min(data.page * data.pageSize, data.total);
+    return `${start}–${end} de ${data.total.toLocaleString("es-AR")}`;
+  }, [data]);
 
   const visibleIds = pageItems.map((o) => o.id);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
@@ -241,13 +243,20 @@ export default function OfertasView() {
   }
 
   const selectedOferta =
-    selectedIds.size === 1 ? (allOfertas?.find((o) => selectedIds.has(o.id)) ?? null) : null;
+    selectedIds.size === 1 ? (data?.items.find((o) => selectedIds.has(o.id)) ?? null) : null;
 
   function handleSingleUpdated(actualizada: Oferta) {
-    setAllOfertas((prev) =>
-      prev ? prev.map((o) => (o.id === actualizada.id ? actualizada : o)) : prev
+    setData((prev) =>
+      prev ? { ...prev, items: prev.items.map((o) => (o.id === actualizada.id ? actualizada : o)) } : prev
     );
     setSelectedIds(new Set());
+  }
+  // A diferencia de handleSingleUpdated, no toca selectedIds — ver el mismo
+  // criterio documentado en CatalogoView.tsx.
+  function handleImagenActualizada(actualizada: Oferta) {
+    setData((prev) =>
+      prev ? { ...prev, items: prev.items.map((o) => (o.id === actualizada.id ? actualizada : o)) } : prev
+    );
   }
   function handleBulkUpdated() {
     setSelectedIds(new Set());
@@ -255,11 +264,23 @@ export default function OfertasView() {
   }
   function handleDeleted(ids: number[]) {
     const eliminadas = new Set(ids);
-    setAllOfertas((prev) => (prev ? prev.filter((o) => !eliminadas.has(o.id)) : prev));
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.filter((o) => !eliminadas.has(o.id)),
+            total: Math.max(0, prev.total - eliminadas.size),
+          }
+        : prev
+    );
     setSelectedIds(new Set());
   }
+  function handleCreated() {
+    setPage(1);
+    setReloadTick((t) => t + 1);
+  }
 
-  const seleccionadas = allOfertas?.filter((o) => selectedIds.has(o.id)) ?? [];
+  const seleccionadas = data?.items.filter((o) => selectedIds.has(o.id)) ?? [];
   const paraCerrar = seleccionadas.filter((o) => o.activa);
   const paraReactivar = seleccionadas.filter((o) => !o.activa);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
@@ -301,7 +322,7 @@ export default function OfertasView() {
     }
   }
 
-  const colSpan = puedeEditar ? 12 : 11;
+  const colSpan = puedeEditar ? 13 : 12;
   const hoy = hoyLocalISO();
 
   return (
@@ -331,6 +352,12 @@ export default function OfertasView() {
             getParams={buildExportParams}
             nombreArchivo="ofertas"
           />
+          {puedeEditar && (
+            <Button onClick={() => setNuevoOpen(true)}>
+              <Plus className="size-3.5" />
+              Nueva oferta
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-5 text-sm">
           <label className="flex cursor-pointer items-center gap-2">
@@ -349,7 +376,7 @@ export default function OfertasView() {
       <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
         <span>{loading ? "Cargando…" : rangoResultados}</span>
         <div className="flex items-center gap-3">
-          {total > 0 && (
+          {data && data.total > 0 && (
             <label className="flex items-center gap-1.5">
               <span className="text-xs">Filas por página</span>
               <Select
@@ -370,24 +397,24 @@ export default function OfertasView() {
               </Select>
             </label>
           )}
-          {totalPages > 1 && (
+          {data && data.totalPages > 1 && (
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
+                disabled={data.page <= 1}
               >
                 Anterior
               </Button>
               <span>
-                Página {page} de {totalPages}
+                Página {data.page} de {data.totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={data.page >= data.totalPages}
               >
                 Siguiente
               </Button>
@@ -459,6 +486,7 @@ export default function OfertasView() {
                   />
                 </TableHead>
               )}
+              <TableHead aria-label="Imagen" />
               <ColumnFilterHeader
                 label="Marca"
                 value={columnFilters.marca}
@@ -577,6 +605,20 @@ export default function OfertasView() {
                         />
                       </TableCell>
                     )}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {oferta.imagenUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imagenSrc(oferta.imagenUrl)}
+                          alt=""
+                          className="size-8 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="flex size-8 items-center justify-center rounded bg-zinc-100 text-zinc-400 dark:bg-zinc-800">
+                          <ImageIcon className="size-3.5" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <HighlightText text={oferta.marca} query={debouncedSearch} />
                     </TableCell>
@@ -653,8 +695,10 @@ export default function OfertasView() {
           open={editOpen}
           onOpenChange={setEditOpen}
           onUpdated={handleSingleUpdated}
+          onImagenUpdated={handleImagenActualizada}
         />
       )}
+      <NuevaOfertaDialog open={nuevoOpen} onOpenChange={setNuevoOpen} onCreated={handleCreated} />
       {editOpen && !selectedOferta && selectedIds.size > 1 && (
         <BulkEditarOfertaDialog
           ids={[...selectedIds]}

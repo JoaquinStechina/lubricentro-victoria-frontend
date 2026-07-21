@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { apiFetch, apiJsonInit } from "@/app/lib/api";
+import { useRef, useState, type FormEvent } from "react";
+import { ImageIcon } from "lucide-react";
+import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import {
   OFERTA_FIELD_LABELS,
   OFERTA_NUMERIC_FIELDS,
@@ -34,19 +35,61 @@ export default function EditarOfertaDialog({
   open,
   onOpenChange,
   onUpdated,
+  onImagenUpdated,
 }: {
   oferta: Oferta;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: (oferta: Oferta) => void;
+  onImagenUpdated: (oferta: Oferta) => void;
 }) {
   const [values, setValues] = useState(() => initialFormValues(oferta));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [imagenLoading, setImagenLoading] = useState(false);
+  const [imagenError, setImagenError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleOpenChange(next: boolean) {
     if (next) setValues(initialFormValues(oferta));
     onOpenChange(next);
+  }
+
+  // Acción independiente del submit del form: se dispara de inmediato al
+  // elegir un archivo, no espera a "Guardar" (ver POST /:id/imagen).
+  async function handleImagenChange(file: File | null) {
+    if (!file) return;
+    setImagenError(null);
+    setImagenLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("imagen", file);
+      const actualizada = await apiFetch<Oferta>(`/api/ofertas/${oferta.id}/imagen`, {
+        method: "POST",
+        body: formData,
+      });
+      onImagenUpdated(actualizada);
+    } catch (err) {
+      setImagenError(err instanceof Error ? err.message : "No se pudo subir la imagen");
+    } finally {
+      setImagenLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleQuitarImagen() {
+    setImagenError(null);
+    setImagenLoading(true);
+    try {
+      const actualizada = await apiFetch<Oferta>(`/api/ofertas/${oferta.id}/imagen`, {
+        method: "DELETE",
+      });
+      onImagenUpdated(actualizada);
+    } catch (err) {
+      setImagenError(err instanceof Error ? err.message : "No se pudo quitar la imagen");
+    } finally {
+      setImagenLoading(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -85,6 +128,52 @@ export default function EditarOfertaDialog({
               {oferta.proveedor?.nombre ?? "—"} · {oferta.skuProveedor}
             </DialogDescription>
           </DialogHeader>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Foto</Label>
+            <div className="flex items-center gap-3">
+              {oferta.imagenUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imagenSrc(oferta.imagenUrl)}
+                  alt=""
+                  className="size-14 rounded object-cover"
+                />
+              ) : (
+                <div className="flex size-14 items-center justify-center rounded bg-zinc-100 text-zinc-400 dark:bg-zinc-800">
+                  <ImageIcon className="size-5" />
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={imagenLoading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {oferta.imagenUrl ? "Reemplazar" : "Subir imagen"}
+              </Button>
+              {oferta.imagenUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={imagenLoading}
+                  onClick={handleQuitarImagen}
+                >
+                  Quitar imagen
+                </Button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => handleImagenChange(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            {imagenError && <p className="text-sm text-destructive">{imagenError}</p>}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             {OFERTA_SINGLE_EDIT_FIELDS.map((campo) => (

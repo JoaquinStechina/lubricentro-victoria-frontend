@@ -76,6 +76,21 @@ token.
 
   Ver `../backend/README.md` para las listas blancas de campos editables y el detalle de cada
   endpoint.
+- **Crear producto/oferta a mano** (`/`, ambas pestañas, solo `ADMINISTRADOR`+): botón "Nuevo
+  producto"/"Nueva oferta" junto al buscador, en paralelo al pipeline de carga masiva por archivo
+  — para dar de alta una fila suelta sin pasar por `/cargas`
+  (`NuevoProductoDialog.tsx`/`NuevaOfertaDialog.tsx`, `POST /api/productos|ofertas`). El campo
+  Proveedor es un combobox con búsqueda que además permite escribir un nombre nuevo
+  (`ProveedorCombobox.tsx`, extraído del mismo patrón que ya usaba `UploadForm.tsx` — el backend
+  lo crea si no existe). En Ofertas, "Desde cantidad" y "Descuento %" son opcionales (vacío = 1 y
+  0%, mismo criterio que una fila de archivo) y el resto de los campos obligatorios los exige el
+  propio input (`required`) antes de tocar el backend.
+- **Imagen por fila** (`/`, ambas pestañas): miniatura como primera columna de la tabla
+  (placeholder gris si no tiene foto). Se sube/reemplaza/quita desde el diálogo de alta o de
+  edición (`ADMINISTRADOR`+, `POST`/`DELETE /api/productos|ofertas/:id/imagen`, JPG/PNG/WEBP hasta
+  5MB) — la subida es una acción aparte del resto del formulario, se dispara apenas se elige el
+  archivo y no espera al botón "Guardar". `imagenSrc()` (`app/lib/api.ts`) arma la URL completa a
+  partir de la ruta relativa que devuelve el backend.
 - **Cargar archivo** (`/cargas`): habla en vivo con el backend (`../backend`, Express + Prisma).
   Subís un archivo (imagen, PDF o excel) de un proveedor, se procesa con IA, y antes de guardar
   nada se muestra una pantalla de revisión donde se puede corregir el mapeo de columnas y

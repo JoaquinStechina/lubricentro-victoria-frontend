@@ -163,10 +163,10 @@ function OfertasActivas() {
 
   function load(incluir: boolean) {
     setLoading(true);
-    apiFetch<{ ofertas: OfertaActiva[] }>(
-      `/api/ofertas${incluir ? "?incluirCerradas=true" : ""}`
-    )
-      .then((res) => setOfertas(res.ofertas))
+    const params = new URLSearchParams({ pageSize: "100" });
+    if (incluir) params.set("incluirCerradas", "true");
+    apiFetch<{ items: OfertaActiva[]; total: number }>(`/api/ofertas?${params.toString()}`)
+      .then((res) => setOfertas(res.items))
       .finally(() => setLoading(false));
   }
 

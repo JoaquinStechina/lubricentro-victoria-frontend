@@ -1,26 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { CheckIcon, ChevronsUpDownIcon, PlusIcon, UploadCloudIcon } from "lucide-react";
-import { API_URL, apiFetch } from "@/app/lib/api";
-import {
-  ACCEPTED_EXTENSIONS,
-  TIPO_DATOS_LABELS,
-  type Carga,
-  type Proveedor,
-  type TipoDatos,
-} from "@/app/lib/cargas";
+import { useRef, useState } from "react";
+import { UploadCloudIcon } from "lucide-react";
+import { API_URL } from "@/app/lib/api";
+import { ACCEPTED_EXTENSIONS, TIPO_DATOS_LABELS, type Carga, type TipoDatos } from "@/app/lib/cargas";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import ProveedorCombobox from "@/app/components/ProveedorCombobox";
 import { Switch } from "@/components/ui/switch";
 
 type UploadFormProps = {
@@ -30,37 +16,12 @@ type UploadFormProps = {
 export default function UploadForm({ onUploaded }: UploadFormProps) {
   const [tipoDatos, setTipoDatos] = useState<TipoDatos>("catalogo");
   const [sinFechaLimite, setSinFechaLimite] = useState(false);
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [proveedorNombre, setProveedorNombre] = useState("");
-  const [proveedorOpen, setProveedorOpen] = useState(false);
-  const [proveedorQuery, setProveedorQuery] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let active = true;
-    apiFetch<Proveedor[]>("/api/proveedores")
-      .then((data) => {
-        if (active) setProveedores(data);
-      })
-      .catch(() => {
-        // Sin lista de proveedores no se rompe el formulario: el campo
-        // sigue aceptando texto libre.
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const proveedoresFiltrados = proveedores.filter((p) =>
-    p.nombre.toLowerCase().includes(proveedorQuery.trim().toLowerCase())
-  );
-  const coincideExacto = proveedores.some(
-    (p) => p.nombre.toLowerCase() === proveedorQuery.trim().toLowerCase()
-  );
 
   function handleFileChange(f: File | null) {
     if (!f) {
@@ -150,67 +111,7 @@ export default function UploadForm({ onUploaded }: UploadFormProps) {
 
       <div className="flex flex-col gap-1 text-sm">
         <span className="text-zinc-600 dark:text-zinc-400">Proveedor</span>
-        <Popover open={proveedorOpen} onOpenChange={setProveedorOpen}>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="outline"
-                className="w-64 justify-between font-normal"
-              />
-            }
-          >
-            <span className={proveedorNombre ? "" : "text-muted-foreground"}>
-              {proveedorNombre || "Elegir o escribir proveedor…"}
-            </span>
-            <ChevronsUpDownIcon className="size-3.5 opacity-50" />
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0" align="start">
-            <Command>
-              <CommandInput
-                placeholder="Buscar proveedor…"
-                value={proveedorQuery}
-                onValueChange={setProveedorQuery}
-              />
-              <CommandList>
-                <CommandEmpty>Sin resultados.</CommandEmpty>
-                <CommandGroup>
-                  {proveedoresFiltrados.map((p) => (
-                    <CommandItem
-                      key={p.id}
-                      value={p.nombre}
-                      onSelect={() => {
-                        setProveedorNombre(p.nombre);
-                        setProveedorQuery("");
-                        setProveedorOpen(false);
-                      }}
-                    >
-                      <CheckIcon
-                        className={cn(
-                          "size-3.5",
-                          proveedorNombre === p.nombre ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      {p.nombre}
-                    </CommandItem>
-                  ))}
-                  {proveedorQuery.trim() && !coincideExacto && (
-                    <CommandItem
-                      value={`crear-${proveedorQuery}`}
-                      onSelect={() => {
-                        setProveedorNombre(proveedorQuery.trim());
-                        setProveedorQuery("");
-                        setProveedorOpen(false);
-                      }}
-                    >
-                      <PlusIcon className="size-3.5" />
-                      Crear “{proveedorQuery.trim()}”
-                    </CommandItem>
-                  )}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        <ProveedorCombobox value={proveedorNombre} onChange={setProveedorNombre} className="w-64" />
         <p className="text-xs text-zinc-500 dark:text-zinc-500">
           Opcional, pero recomendado: sin proveedor no se puede resolver el mapeo de columnas.
         </p>

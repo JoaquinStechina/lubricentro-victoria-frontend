@@ -16,6 +16,7 @@ export type Producto = {
   moneda: string;
   unidad: string | null;
   fechaVigencia: string | null;
+  imagenUrl: string | null;
   vigente: boolean;
   eliminado: boolean;
   rawData: Record<string, unknown> | null;
