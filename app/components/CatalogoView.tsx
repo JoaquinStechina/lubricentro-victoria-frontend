@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { History } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
 import { useSession } from "@/app/components/SessionProvider";
@@ -10,6 +11,7 @@ import HighlightText from "@/app/components/HighlightText";
 import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
 import BulkEditarProductoDialog from "@/app/components/catalogo/BulkEditarProductoDialog";
 import EliminarProductosDialog from "@/app/components/catalogo/EliminarProductosDialog";
+import HistorialProductoDialog from "@/app/components/catalogo/HistorialProductoDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -102,6 +104,7 @@ export default function CatalogoView() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [historialProducto, setHistorialProducto] = useState<Producto | null>(null);
 
   // Debounce los campos de texto para no disparar un fetch por cada tecla.
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -260,7 +263,7 @@ export default function CatalogoView() {
     setSelectedIds(new Set());
   }
 
-  const colSpan = puedeEditar ? 10 : 9;
+  const colSpan = puedeEditar ? 11 : 10;
 
   return (
     <>
@@ -469,6 +472,7 @@ export default function CatalogoView() {
                 sortDirection={sort?.campo === "fechaVigencia" ? sort.order : null}
                 onSortToggle={() => toggleSort("fechaVigencia")}
               />
+              <TableHead aria-label="Historial" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -554,6 +558,17 @@ export default function CatalogoView() {
                         query={debouncedSearch}
                       />
                     </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => setHistorialProducto(producto)}
+                        aria-label="Ver historial de precios"
+                        title="Ver historial de precios"
+                      >
+                        <History className="size-3.5" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                   {isExpanded && hasRawData && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
@@ -597,6 +612,15 @@ export default function CatalogoView() {
         onOpenChange={setDeleteOpen}
         onDeleted={handleDeleted}
       />
+      {historialProducto && (
+        <HistorialProductoDialog
+          producto={historialProducto}
+          open={historialProducto !== null}
+          onOpenChange={(next) => {
+            if (!next) setHistorialProducto(null);
+          }}
+        />
+      )}
     </>
   );
 }

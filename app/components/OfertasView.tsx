@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { History } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
 import { useSession } from "@/app/components/SessionProvider";
@@ -10,6 +11,7 @@ import HighlightText from "@/app/components/HighlightText";
 import EditarOfertaDialog from "@/app/components/ofertas/EditarOfertaDialog";
 import BulkEditarOfertaDialog from "@/app/components/ofertas/BulkEditarOfertaDialog";
 import EliminarOfertasDialog from "@/app/components/ofertas/EliminarOfertasDialog";
+import HistorialOfertaDialog from "@/app/components/ofertas/HistorialOfertaDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -114,6 +116,7 @@ export default function OfertasView() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [historialOferta, setHistorialOferta] = useState<Oferta | null>(null);
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [debouncedColumnFilters, setDebouncedColumnFilters] = useState(
@@ -298,7 +301,7 @@ export default function OfertasView() {
     }
   }
 
-  const colSpan = puedeEditar ? 11 : 10;
+  const colSpan = puedeEditar ? 12 : 11;
   const hoy = hoyLocalISO();
 
   return (
@@ -541,6 +544,7 @@ export default function OfertasView() {
                 onSortToggle={() => toggleSort("fechaHasta")}
               />
               <TableHead>Estado</TableHead>
+              <TableHead aria-label="Historial" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -611,6 +615,17 @@ export default function OfertasView() {
                         {oferta.eliminado && <Badge variant="destructive">Eliminada</Badge>}
                       </span>
                     </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => setHistorialOferta(oferta)}
+                        aria-label="Ver historial del tramo"
+                        title="Ver historial del tramo"
+                      >
+                        <History className="size-3.5" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
@@ -654,6 +669,15 @@ export default function OfertasView() {
         onOpenChange={setDeleteOpen}
         onDeleted={handleDeleted}
       />
+      {historialOferta && (
+        <HistorialOfertaDialog
+          oferta={historialOferta}
+          open={historialOferta !== null}
+          onOpenChange={(next) => {
+            if (!next) setHistorialOferta(null);
+          }}
+        />
+      )}
     </>
   );
 }
