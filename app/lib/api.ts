@@ -1,5 +1,6 @@
 // Cliente fetch fino hacia el backend (Express, repo hermano `backend/`).
 // Fetch directo desde el cliente, sin proxy vía Route Handler.
+// ping-pipeline-1784735891: commit de prueba para el deploy automatico
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
