@@ -48,6 +48,7 @@ export const CANONICAL_FIELDS_OFERTAS = [
   "fecha_oferta",
   "hora_oferta",
   "fecha_hasta",
+  "cantidad_disponible",
 ] as const;
 
 export type OfertaField = (typeof CANONICAL_FIELDS_OFERTAS)[number];
@@ -64,6 +65,7 @@ export const OFERTA_FIELD_LABELS: Record<OfertaField, string> = {
   fecha_oferta: "Fecha oferta",
   hora_oferta: "Hora oferta",
   fecha_hasta: "Válida hasta",
+  cantidad_disponible: "Cantidad disponible",
 };
 
 export type OfertaColumnMapping = Record<string, OfertaField>;

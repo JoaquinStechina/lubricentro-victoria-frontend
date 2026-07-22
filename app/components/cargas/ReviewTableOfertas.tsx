@@ -357,13 +357,16 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
                               ? "vacío = 1"
                               : field === "descuento_pct"
                                 ? "vacío = 0"
-                                : undefined
+                                : field === "cantidad_disponible"
+                                  ? "vacío = sin dato"
+                                  : undefined
                           }
                           inputMode={
                             field === "precio_unitario" ||
                             field === "descuento_pct" ||
                             field === "desde_cantidad" ||
-                            field === "numero_oferta"
+                            field === "numero_oferta" ||
+                            field === "cantidad_disponible"
                               ? "decimal"
                               : "text"
                           }

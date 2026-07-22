@@ -10,11 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Pantalla mínima sobre los datos ya publicados desde /cargas (ProductoPrecio
-// vigente / Oferta activa) — hoy no existía ninguna vista de esto desde el
-// backend nuevo, el "/" público sigue leyendo los JSON estáticos del
-// prototipo original (ver ../../../../contexto.md). Sin buscador ni filtros
-// por columna a propósito: es solo para ver el estado actual y cerrar
-// ofertas, no un reemplazo del catálogo público.
+// vigente / Oferta activa) — complementa a "/" (que ya lee del backend real,
+// ver ../../../../contexto.md), con foco en cerrar/reactivar ofertas. Sin
+// buscador ni filtros por columna a propósito: es solo para ver el estado
+// actual, no un reemplazo del catálogo público.
 
 type ProductoVigente = {
   id: number;
@@ -37,6 +36,7 @@ type OfertaActiva = {
   descuentoPct: number;
   precioUnitario: number;
   fechaHasta: string | null;
+  cantidadDisponible: number | null;
   activa: boolean;
 };
 
@@ -214,6 +214,7 @@ function OfertasActivas() {
               <TableHead>Desde cant.</TableHead>
               <TableHead>Descuento</TableHead>
               <TableHead>Precio unitario</TableHead>
+              <TableHead>Cantidad disp.</TableHead>
               <TableHead>Válida hasta</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead />
@@ -222,14 +223,14 @@ function OfertasActivas() {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={10} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
+                <TableCell colSpan={11} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
                   Cargando…
                 </TableCell>
               </TableRow>
             )}
             {!loading && ofertas?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
+                <TableCell colSpan={11} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
                   No hay ofertas {incluirCerradas ? "" : "activas"}.
                 </TableCell>
               </TableRow>
@@ -244,6 +245,9 @@ function OfertasActivas() {
                 <TableCell className="text-zinc-700 dark:text-zinc-300">{o.descuentoPct}%</TableCell>
                 <TableCell className="text-zinc-900 dark:text-zinc-100">
                   {currencyFormatter.format(o.precioUnitario)}
+                </TableCell>
+                <TableCell className="text-zinc-700 dark:text-zinc-300">
+                  {o.cantidadDisponible ?? "—"}
                 </TableCell>
                 <TableCell className="text-zinc-700 dark:text-zinc-300">
                   {o.fechaHasta ?? "hasta agotar stock"}

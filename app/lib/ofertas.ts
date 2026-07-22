@@ -16,6 +16,7 @@ export type Oferta = {
   fechaOferta: string;
   horaOferta: string;
   fechaHasta: string | null;
+  cantidadDisponible: number | null;
   imagenUrl: string | null;
   activa: boolean;
   eliminado: boolean;
@@ -40,7 +41,9 @@ export type OfertaColumnKey =
   | "precioUnitarioMax"
   | "fechaOferta"
   | "vigencia"
-  | "fechaHasta";
+  | "fechaHasta"
+  | "cantidadDisponibleMin"
+  | "cantidadDisponibleMax";
 
 // Campos que puede tocar PATCH /api/ofertas/:id (edición de una fila). No
 // incluye `activa`: eso solo lo tocan POST /cerrar y /reactivar.
@@ -56,6 +59,7 @@ export const OFERTA_SINGLE_EDIT_FIELDS = [
   "fechaOferta",
   "horaOferta",
   "fechaHasta",
+  "cantidadDisponible",
 ] as const;
 export type OfertaSingleEditField = (typeof OFERTA_SINGLE_EDIT_FIELDS)[number];
 
@@ -69,6 +73,7 @@ export const OFERTA_BULK_EDIT_FIELDS = [
   "fechaOferta",
   "horaOferta",
   "fechaHasta",
+  "cantidadDisponible",
 ] as const;
 export type OfertaBulkEditField = (typeof OFERTA_BULK_EDIT_FIELDS)[number];
 
@@ -84,6 +89,7 @@ export const OFERTA_FIELD_LABELS: Record<OfertaSingleEditField, string> = {
   fechaOferta: "Fecha oferta",
   horaOferta: "Hora oferta",
   fechaHasta: "Vigente hasta",
+  cantidadDisponible: "Cantidad disponible",
 };
 
 export const OFERTA_NUMERIC_FIELDS = new Set<string>([
@@ -91,4 +97,10 @@ export const OFERTA_NUMERIC_FIELDS = new Set<string>([
   "desdeCantidad",
   "descuentoPct",
   "precioUnitario",
+  "cantidadDisponible",
 ]);
+
+// Campos opcionales de verdad (sin default, nullable) — igual que
+// fechaHasta, no exigidos por el formulario y se guardan como null si
+// quedan vacíos, no como 0 ni se omiten.
+export const OFERTA_NULLABLE_FIELDS = new Set<string>(["fechaHasta", "cantidadDisponible"]);

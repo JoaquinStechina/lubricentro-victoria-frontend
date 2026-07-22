@@ -5,6 +5,7 @@ import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import {
   OFERTA_BULK_EDIT_FIELDS,
   OFERTA_FIELD_LABELS,
+  OFERTA_NULLABLE_FIELDS,
   OFERTA_NUMERIC_FIELDS,
   type OfertaBulkEditField,
 } from "@/app/lib/ofertas";
@@ -53,6 +54,9 @@ export default function BulkEditarOfertaDialog({
     try {
       const trimmed = value.trim();
       const isFechaHasta = field === "fechaHasta";
+      // cantidadDisponible es nulleable pero numérico: a diferencia de los
+      // demás campos numéricos de este diálogo, vacío es null, no 0.
+      const isNullableNumeric = field !== "fechaHasta" && OFERTA_NULLABLE_FIELDS.has(field);
       await apiFetch<{ actualizados: number }>(
         "/api/ofertas/editar-lote",
         apiJsonInit(
@@ -63,9 +67,13 @@ export default function BulkEditarOfertaDialog({
               ? trimmed === ""
                 ? null
                 : trimmed
-              : OFERTA_NUMERIC_FIELDS.has(field)
-                ? Number(trimmed)
-                : trimmed,
+              : isNullableNumeric
+                ? trimmed === ""
+                  ? null
+                  : Number(trimmed)
+                : OFERTA_NUMERIC_FIELDS.has(field)
+                  ? Number(trimmed)
+                  : trimmed,
           },
           "POST"
         )
@@ -110,8 +118,14 @@ export default function BulkEditarOfertaDialog({
             <Label htmlFor="bulk-oferta-valor">Valor nuevo</Label>
             <Input
               id="bulk-oferta-valor"
-              required={field !== "fechaHasta"}
-              placeholder={field === "fechaHasta" ? "vacío = hasta agotar stock" : undefined}
+              required={!OFERTA_NULLABLE_FIELDS.has(field)}
+              placeholder={
+                field === "fechaHasta"
+                  ? "vacío = hasta agotar stock"
+                  : field === "cantidadDisponible"
+                    ? "vacío = sin dato"
+                    : undefined
+              }
               value={value}
               onChange={(e) => setValue(e.target.value)}
               inputMode={OFERTA_NUMERIC_FIELDS.has(field) ? "decimal" : "text"}

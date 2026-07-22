@@ -5,6 +5,7 @@ import { ImageIcon } from "lucide-react";
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import {
   OFERTA_FIELD_LABELS,
+  OFERTA_NULLABLE_FIELDS,
   OFERTA_NUMERIC_FIELDS,
   OFERTA_SINGLE_EDIT_FIELDS,
   type Oferta,
@@ -102,6 +103,10 @@ export default function EditarOfertaDialog({
         const raw = values[campo].trim();
         if (campo === "fechaHasta") {
           body[campo] = raw === "" ? null : raw;
+        } else if (OFERTA_NULLABLE_FIELDS.has(campo)) {
+          // cantidadDisponible: a diferencia del resto de los numéricos, no
+          // tiene default — vacío es "no informado" (null), no 0.
+          body[campo] = raw === "" ? null : Number(raw);
         } else if (OFERTA_NUMERIC_FIELDS.has(campo)) {
           body[campo] = Number(raw);
         } else {
@@ -181,8 +186,14 @@ export default function EditarOfertaDialog({
                 <Label htmlFor={`editar-oferta-${campo}`}>{OFERTA_FIELD_LABELS[campo]}</Label>
                 <Input
                   id={`editar-oferta-${campo}`}
-                  required={campo !== "fechaHasta"}
-                  placeholder={campo === "fechaHasta" ? "vacío = hasta agotar stock" : undefined}
+                  required={!OFERTA_NULLABLE_FIELDS.has(campo)}
+                  placeholder={
+                    campo === "fechaHasta"
+                      ? "vacío = hasta agotar stock"
+                      : campo === "cantidadDisponible"
+                        ? "vacío = sin dato"
+                        : undefined
+                  }
                   value={values[campo]}
                   onChange={(e) => setValues((prev) => ({ ...prev, [campo]: e.target.value }))}
                   inputMode={OFERTA_NUMERIC_FIELDS.has(campo) ? "decimal" : "text"}

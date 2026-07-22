@@ -5,6 +5,7 @@ import { ImageIcon, XIcon } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import {
   OFERTA_FIELD_LABELS,
+  OFERTA_NULLABLE_FIELDS,
   OFERTA_NUMERIC_FIELDS,
   OFERTA_SINGLE_EDIT_FIELDS,
   type Oferta,
@@ -139,17 +140,19 @@ export default function NuevaOfertaDialog({
                 <Label htmlFor={`nueva-oferta-${campo}`}>{OFERTA_FIELD_LABELS[campo]}</Label>
                 <Input
                   id={`nueva-oferta-${campo}`}
-                  required={campo !== "fechaHasta" && !CAMPOS_CON_DEFAULT.has(campo)}
+                  required={!OFERTA_NULLABLE_FIELDS.has(campo) && !CAMPOS_CON_DEFAULT.has(campo)}
                   placeholder={
                     campo === "fechaHasta"
                       ? "vacío = hasta agotar stock"
-                      : campo === "desdeCantidad"
-                        ? "vacío = 1"
-                        : campo === "descuentoPct"
-                          ? "vacío = 0"
-                          : campo === "moneda"
-                            ? "vacío = ARS"
-                            : undefined
+                      : campo === "cantidadDisponible"
+                        ? "vacío = sin dato"
+                        : campo === "desdeCantidad"
+                          ? "vacío = 1"
+                          : campo === "descuentoPct"
+                            ? "vacío = 0"
+                            : campo === "moneda"
+                              ? "vacío = ARS"
+                              : undefined
                   }
                   value={values[campo]}
                   onChange={(e) => setValues((prev) => ({ ...prev, [campo]: e.target.value }))}

@@ -58,6 +58,8 @@ const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
   fechaOferta: "",
   vigencia: "",
   fechaHasta: "",
+  cantidadDisponibleMin: "",
+  cantidadDisponibleMax: "",
 };
 
 type SortState = { campo: string; order: "asc" | "desc" } | null;
@@ -322,7 +324,7 @@ export default function OfertasView() {
     }
   }
 
-  const colSpan = puedeEditar ? 13 : 12;
+  const colSpan = puedeEditar ? 14 : 13;
   const hoy = hoyLocalISO();
 
   return (
@@ -555,6 +557,25 @@ export default function OfertasView() {
                 onSortToggle={() => toggleSort("precioUnitario")}
               />
               <ColumnFilterHeader
+                label="Cantidad disp."
+                value=""
+                onChange={() => {}}
+                rangeValue={{
+                  min: columnFilters.cantidadDisponibleMin,
+                  max: columnFilters.cantidadDisponibleMax,
+                }}
+                onRangeChange={(min, max) =>
+                  setColumnFilters((prev) => ({
+                    ...prev,
+                    cantidadDisponibleMin: min,
+                    cantidadDisponibleMax: max,
+                  }))
+                }
+                align="right"
+                sortDirection={sort?.campo === "cantidadDisponible" ? sort.order : null}
+                onSortToggle={() => toggleSort("cantidadDisponible")}
+              />
+              <ColumnFilterHeader
                 label="Vigencia"
                 value={columnFilters.fechaOferta}
                 onChange={(v) => setColumnFilter("fechaOferta", v)}
@@ -639,6 +660,11 @@ export default function OfertasView() {
                     </TableCell>
                     <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
                       <HighlightText text={formatPrecio(oferta.precioUnitario)} query={debouncedSearch} />
+                    </TableCell>
+                    <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
+                      {oferta.cantidadDisponible ?? (
+                        <span className="text-zinc-400 dark:text-zinc-600">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-zinc-700 dark:text-zinc-300">
                       <HighlightText text={oferta.fechaOferta} query={debouncedSearch} />
