@@ -1,13 +1,16 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { History, ImageIcon, Plus } from "lucide-react";
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
+import { useColumnPrefs } from "@/app/lib/useColumnPrefs";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
+import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/ColumnVisibilityMenu";
 import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
+import TablePaginationBar from "@/app/components/TablePaginationBar";
 import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
 import NuevoProductoDialog from "@/app/components/catalogo/NuevoProductoDialog";
 import BulkEditarProductoDialog from "@/app/components/catalogo/BulkEditarProductoDialog";
@@ -19,13 +22,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -44,6 +40,21 @@ type ApiResponse = {
 };
 
 const PAGE_SIZES = [50, 100, 200] as const;
+
+// Ver mismo criterio en OfertasView.tsx: checkbox/miniatura/historial son
+// estructurales y no entran acá.
+const CATALOGO_COLUMN_OPTIONS: ColumnOption[] = [
+  { key: "proveedor", label: "Proveedor" },
+  { key: "marca", label: "Marca" },
+  { key: "sku", label: "SKU interno" },
+  { key: "descripcion", label: "Descripción" },
+  { key: "seccion", label: "Sección" },
+  { key: "precioNeto", label: "Precio neto" },
+  { key: "precioConIva", label: "Precio c/IVA" },
+  { key: "alicuotaIva", label: "IVA %" },
+  { key: "fechaVigencia", label: "Vigencia" },
+];
+const CATALOGO_DEFAULT_COLUMN_ORDER = CATALOGO_COLUMN_OPTIONS.map((c) => c.key);
 
 const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   proveedor: "",
@@ -107,6 +118,14 @@ export default function CatalogoView() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [historialProducto, setHistorialProducto] = useState<Producto | null>(null);
+
+  const {
+    order: columnOrder,
+    hidden: hiddenColumns,
+    setOrder: setColumnOrder,
+    toggleColumn,
+    reset: resetColumnPrefs,
+  } = useColumnPrefs("lv:columnas:catalogo", CATALOGO_DEFAULT_COLUMN_ORDER);
 
   // Debounce los campos de texto para no disparar un fetch por cada tecla.
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -279,7 +298,188 @@ export default function CatalogoView() {
     setSelectedIds(new Set());
   }
 
-  const colSpan = puedeEditar ? 12 : 11;
+  // Cada entrada envuelve exactamente el mismo JSX que antes estaba
+  // hardcodeado en el header/las filas — ver mismo patrón en OfertasView.tsx.
+  const columnDefsByKey: Record<string, { header: () => ReactNode; cell: (producto: Producto) => ReactNode }> = {
+    proveedor: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Proveedor"
+          value={columnFilters.proveedor}
+          onChange={(v) => setColumnFilter("proveedor", v)}
+          sortDirection={sort?.campo === "proveedor" ? sort.order : null}
+          onSortToggle={() => toggleSort("proveedor")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          <span className="flex items-center gap-1.5">
+            <HighlightText text={producto.proveedor?.nombre ?? "—"} query={debouncedSearch} />
+            {producto.eliminado && <Badge variant="destructive">Eliminado</Badge>}
+          </span>
+        </TableCell>
+      ),
+    },
+    marca: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Marca"
+          value={columnFilters.marca}
+          onChange={(v) => setColumnFilter("marca", v)}
+          sortDirection={sort?.campo === "marca" ? sort.order : null}
+          onSortToggle={() => toggleSort("marca")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={producto.marca ?? "—"} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    sku: {
+      header: () => (
+        <ColumnFilterHeader
+          label="SKU interno"
+          value={columnFilters.sku}
+          onChange={(v) => setColumnFilter("sku", v)}
+          sortDirection={sort?.campo === "sku" ? sort.order : null}
+          onSortToggle={() => toggleSort("sku")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
+          <HighlightText
+            text={producto.skuInterno ?? producto.skuProveedor ?? "—"}
+            query={debouncedSearch}
+          />
+        </TableCell>
+      ),
+    },
+    descripcion: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Descripción"
+          value={columnFilters.descripcion}
+          onChange={(v) => setColumnFilter("descripcion", v)}
+          sortDirection={sort?.campo === "descripcion" ? sort.order : null}
+          onSortToggle={() => toggleSort("descripcion")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={producto.descripcion ?? "—"} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    seccion: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Sección"
+          value={columnFilters.seccion}
+          onChange={(v) => setColumnFilter("seccion", v)}
+          searchOptions={secciones}
+          sortDirection={sort?.campo === "seccion" ? sort.order : null}
+          onSortToggle={() => toggleSort("seccion")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={producto.seccion ?? "—"} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    precioNeto: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Precio neto"
+          value=""
+          onChange={() => {}}
+          rangeValue={{ min: columnFilters.precioNetoMin, max: columnFilters.precioNetoMax }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({ ...prev, precioNetoMin: min, precioNetoMax: max }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "precioNeto" ? sort.order : null}
+          onSortToggle={() => toggleSort("precioNeto")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={formatPrecio(producto.precioNeto)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    precioConIva: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Precio c/IVA"
+          value=""
+          onChange={() => {}}
+          rangeValue={{
+            min: columnFilters.precioConIvaMin,
+            max: columnFilters.precioConIvaMax,
+          }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({
+              ...prev,
+              precioConIvaMin: min,
+              precioConIvaMax: max,
+            }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "precioConIva" ? sort.order : null}
+          onSortToggle={() => toggleSort("precioConIva")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={formatPrecio(producto.precioConIva)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    alicuotaIva: {
+      header: () => (
+        <ColumnFilterHeader
+          label="IVA %"
+          value={columnFilters.alicuotaIva}
+          onChange={(v) => setColumnFilter("alicuotaIva", v)}
+          align="right"
+          sortDirection={sort?.campo === "alicuotaIva" ? sort.order : null}
+          onSortToggle={() => toggleSort("alicuotaIva")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
+          <HighlightText
+            text={producto.alicuotaIva !== null ? String(producto.alicuotaIva) : "—"}
+            query={debouncedSearch}
+          />
+        </TableCell>
+      ),
+    },
+    fechaVigencia: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Vigencia"
+          value={columnFilters.fechaVigencia}
+          onChange={(v) => setColumnFilter("fechaVigencia", v)}
+          sortDirection={sort?.campo === "fechaVigencia" ? sort.order : null}
+          onSortToggle={() => toggleSort("fechaVigencia")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={producto.fechaVigencia ?? "—"} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+  };
+
+  const visibleColumnDefs = columnOrder
+    .filter((key) => !hiddenColumns.has(key))
+    .map((key) => ({ key, def: columnDefsByKey[key] }));
+
+  const colSpan = (puedeEditar ? 1 : 0) + 1 + visibleColumnDefs.length + 1;
 
   return (
     <>
@@ -303,6 +503,14 @@ export default function CatalogoView() {
               Limpiar filtros
             </Button>
           )}
+          <ColumnVisibilityMenu
+            columns={CATALOGO_COLUMN_OPTIONS}
+            order={columnOrder}
+            hidden={hiddenColumns}
+            onReorder={setColumnOrder}
+            onToggle={toggleColumn}
+            onReset={resetColumnPrefs}
+          />
           <ExportarButton
             exportPath="/api/productos/export"
             getParams={buildExportParams}
@@ -325,55 +533,15 @@ export default function CatalogoView() {
         )}
       </section>
 
-      <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
-        <span>{loading ? "Cargando…" : rangoResultados}</span>
-        <div className="flex items-center gap-3">
-          {data && data.total > 0 && (
-            <label className="flex items-center gap-1.5">
-              <span className="text-xs">Filas por página</span>
-              <Select
-                items={Object.fromEntries(PAGE_SIZES.map((n) => [String(n), String(n)]))}
-                value={String(pageSize)}
-                onValueChange={(v) => setPageSize(Number(v))}
-              >
-                <SelectTrigger size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZES.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-          )}
-          {data && data.totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={data.page <= 1}
-              >
-                Anterior
-              </Button>
-              <span>
-                Página {data.page} de {data.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                disabled={data.page >= data.totalPages}
-              >
-                Siguiente
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <TablePaginationBar
+        loading={loading}
+        data={data}
+        rangoResultados={rangoResultados}
+        pageSizeOptions={PAGE_SIZES}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        className="mb-2"
+      />
 
       {puedeEditar && selectedIds.size > 0 && (
         <div className="mb-2 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
@@ -413,88 +581,9 @@ export default function CatalogoView() {
                 </TableHead>
               )}
               <TableHead aria-label="Imagen" />
-              <ColumnFilterHeader
-                label="Proveedor"
-                value={columnFilters.proveedor}
-                onChange={(v) => setColumnFilter("proveedor", v)}
-                sortDirection={sort?.campo === "proveedor" ? sort.order : null}
-                onSortToggle={() => toggleSort("proveedor")}
-              />
-              <ColumnFilterHeader
-                label="Marca"
-                value={columnFilters.marca}
-                onChange={(v) => setColumnFilter("marca", v)}
-                sortDirection={sort?.campo === "marca" ? sort.order : null}
-                onSortToggle={() => toggleSort("marca")}
-              />
-              <ColumnFilterHeader
-                label="SKU interno"
-                value={columnFilters.sku}
-                onChange={(v) => setColumnFilter("sku", v)}
-                sortDirection={sort?.campo === "sku" ? sort.order : null}
-                onSortToggle={() => toggleSort("sku")}
-              />
-              <ColumnFilterHeader
-                label="Descripción"
-                value={columnFilters.descripcion}
-                onChange={(v) => setColumnFilter("descripcion", v)}
-                sortDirection={sort?.campo === "descripcion" ? sort.order : null}
-                onSortToggle={() => toggleSort("descripcion")}
-              />
-              <ColumnFilterHeader
-                label="Sección"
-                value={columnFilters.seccion}
-                onChange={(v) => setColumnFilter("seccion", v)}
-                searchOptions={secciones}
-                sortDirection={sort?.campo === "seccion" ? sort.order : null}
-                onSortToggle={() => toggleSort("seccion")}
-              />
-              <ColumnFilterHeader
-                label="Precio neto"
-                value=""
-                onChange={() => {}}
-                rangeValue={{ min: columnFilters.precioNetoMin, max: columnFilters.precioNetoMax }}
-                onRangeChange={(min, max) =>
-                  setColumnFilters((prev) => ({ ...prev, precioNetoMin: min, precioNetoMax: max }))
-                }
-                align="right"
-                sortDirection={sort?.campo === "precioNeto" ? sort.order : null}
-                onSortToggle={() => toggleSort("precioNeto")}
-              />
-              <ColumnFilterHeader
-                label="Precio c/IVA"
-                value=""
-                onChange={() => {}}
-                rangeValue={{
-                  min: columnFilters.precioConIvaMin,
-                  max: columnFilters.precioConIvaMax,
-                }}
-                onRangeChange={(min, max) =>
-                  setColumnFilters((prev) => ({
-                    ...prev,
-                    precioConIvaMin: min,
-                    precioConIvaMax: max,
-                  }))
-                }
-                align="right"
-                sortDirection={sort?.campo === "precioConIva" ? sort.order : null}
-                onSortToggle={() => toggleSort("precioConIva")}
-              />
-              <ColumnFilterHeader
-                label="IVA %"
-                value={columnFilters.alicuotaIva}
-                onChange={(v) => setColumnFilter("alicuotaIva", v)}
-                align="right"
-                sortDirection={sort?.campo === "alicuotaIva" ? sort.order : null}
-                onSortToggle={() => toggleSort("alicuotaIva")}
-              />
-              <ColumnFilterHeader
-                label="Vigencia"
-                value={columnFilters.fechaVigencia}
-                onChange={(v) => setColumnFilter("fechaVigencia", v)}
-                sortDirection={sort?.campo === "fechaVigencia" ? sort.order : null}
-                onSortToggle={() => toggleSort("fechaVigencia")}
-              />
+              {visibleColumnDefs.map(({ key, def }) => (
+                <Fragment key={key}>{def.header()}</Fragment>
+              ))}
               <TableHead aria-label="Historial" />
             </TableRow>
           </TableHeader>
@@ -547,54 +636,9 @@ export default function CatalogoView() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <span className="flex items-center gap-1.5">
-                        <HighlightText text={producto.proveedor?.nombre ?? "—"} query={debouncedSearch} />
-                        {producto.eliminado && <Badge variant="destructive">Eliminado</Badge>}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={producto.marca ?? "—"} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                      <HighlightText
-                        text={producto.skuInterno ?? producto.skuProveedor ?? "—"}
-                        query={debouncedSearch}
-                      />
-                    </TableCell>
-                    <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
-                      <HighlightText
-                        text={producto.descripcion ?? "—"}
-                        query={debouncedSearch}
-                      />
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={producto.seccion ?? "—"} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
-                      <HighlightText
-                        text={formatPrecio(producto.precioNeto)}
-                        query={debouncedSearch}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
-                      <HighlightText
-                        text={formatPrecio(producto.precioConIva)}
-                        query={debouncedSearch}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      <HighlightText
-                        text={producto.alicuotaIva !== null ? String(producto.alicuotaIva) : "—"}
-                        query={debouncedSearch}
-                      />
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText
-                        text={producto.fechaVigencia ?? "—"}
-                        query={debouncedSearch}
-                      />
-                    </TableCell>
+                    {visibleColumnDefs.map(({ key, def }) => (
+                      <Fragment key={key}>{def.cell(producto)}</Fragment>
+                    ))}
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="ghost"
@@ -626,6 +670,16 @@ export default function CatalogoView() {
           </TableBody>
         </Table>
       </div>
+
+      <TablePaginationBar
+        loading={loading}
+        data={data}
+        rangoResultados={rangoResultados}
+        pageSizeOptions={PAGE_SIZES}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        className="mt-2"
+      />
 
       {editOpen && selectedProducto && (
         <EditarProductoDialog

@@ -1,13 +1,16 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { History, ImageIcon, Plus } from "lucide-react";
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
+import { useColumnPrefs } from "@/app/lib/useColumnPrefs";
 import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
+import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/ColumnVisibilityMenu";
 import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
+import TablePaginationBar from "@/app/components/TablePaginationBar";
 import EditarOfertaDialog from "@/app/components/ofertas/EditarOfertaDialog";
 import NuevaOfertaDialog from "@/app/components/ofertas/NuevaOfertaDialog";
 import BulkEditarOfertaDialog from "@/app/components/ofertas/BulkEditarOfertaDialog";
@@ -19,13 +22,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -44,6 +40,25 @@ type ApiResponse = {
 };
 
 const PAGE_SIZES = [50, 100, 200] as const;
+
+// Definen tanto el orden por defecto de las columnas de datos como las
+// etiquetas que se muestran en el menú "Columnas" — el checkbox de
+// selección, la miniatura y el botón de historial quedan fijos (no son
+// datos) y no entran acá.
+const OFERTAS_COLUMN_OPTIONS: ColumnOption[] = [
+  { key: "marca", label: "Marca" },
+  { key: "numeroOferta", label: "N° oferta" },
+  { key: "sku", label: "SKU proveedor" },
+  { key: "descripcion", label: "Descripción" },
+  { key: "desdeCantidad", label: "Desde cant." },
+  { key: "descuentoPct", label: "Descuento" },
+  { key: "precioUnitario", label: "Precio unitario" },
+  { key: "cantidadDisponible", label: "Cantidad disp." },
+  { key: "fechaOferta", label: "Vigencia" },
+  { key: "fechaHasta", label: "Válida hasta" },
+  { key: "estado", label: "Estado" },
+];
+const OFERTAS_DEFAULT_COLUMN_ORDER = OFERTAS_COLUMN_OPTIONS.map((c) => c.key);
 
 const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
   marca: "",
@@ -124,6 +139,14 @@ export default function OfertasView() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [historialOferta, setHistorialOferta] = useState<Oferta | null>(null);
+
+  const {
+    order: columnOrder,
+    hidden: hiddenColumns,
+    setOrder: setColumnOrder,
+    toggleColumn,
+    reset: resetColumnPrefs,
+  } = useColumnPrefs("lv:columnas:ofertas", OFERTAS_DEFAULT_COLUMN_ORDER);
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [debouncedColumnFilters, setDebouncedColumnFilters] = useState(
@@ -324,8 +347,228 @@ export default function OfertasView() {
     }
   }
 
-  const colSpan = puedeEditar ? 14 : 13;
   const hoy = hoyLocalISO();
+
+  // Cada entrada envuelve exactamente el mismo JSX que antes estaba
+  // hardcodeado en el header/las filas — nada de contenido cambia acá, solo
+  // pasa a poder mostrarse/ocultarse y reordenarse.
+  const columnDefsByKey: Record<string, { header: () => ReactNode; cell: (oferta: Oferta) => ReactNode }> = {
+    marca: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Marca"
+          value={columnFilters.marca}
+          onChange={(v) => setColumnFilter("marca", v)}
+          sortDirection={sort?.campo === "marca" ? sort.order : null}
+          onSortToggle={() => toggleSort("marca")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={oferta.marca} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    numeroOferta: {
+      header: () => (
+        <ColumnFilterHeader
+          label="N° oferta"
+          value={columnFilters.numeroOferta}
+          onChange={(v) => setColumnFilter("numeroOferta", v)}
+          sortDirection={sort?.campo === "numeroOferta" ? sort.order : null}
+          onSortToggle={() => toggleSort("numeroOferta")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={String(oferta.numeroOferta)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    sku: {
+      header: () => (
+        <ColumnFilterHeader
+          label="SKU proveedor"
+          value={columnFilters.sku}
+          onChange={(v) => setColumnFilter("sku", v)}
+          sortDirection={sort?.campo === "sku" ? sort.order : null}
+          onSortToggle={() => toggleSort("sku")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={oferta.skuProveedor} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    descripcion: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Descripción"
+          value={columnFilters.descripcion}
+          onChange={(v) => setColumnFilter("descripcion", v)}
+          sortDirection={sort?.campo === "descripcion" ? sort.order : null}
+          onSortToggle={() => toggleSort("descripcion")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={oferta.descripcion} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    desdeCantidad: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Desde cant."
+          value={columnFilters.desdeCantidad}
+          onChange={(v) => setColumnFilter("desdeCantidad", v)}
+          align="right"
+          sortDirection={sort?.campo === "desdeCantidad" ? sort.order : null}
+          onSortToggle={() => toggleSort("desdeCantidad")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={String(oferta.desdeCantidad)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    descuentoPct: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Descuento"
+          value=""
+          onChange={() => {}}
+          rangeValue={{ min: columnFilters.descuentoPctMin, max: columnFilters.descuentoPctMax }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({ ...prev, descuentoPctMin: min, descuentoPctMax: max }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "descuentoPct" ? sort.order : null}
+          onSortToggle={() => toggleSort("descuentoPct")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={`${oferta.descuentoPct}%`} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    precioUnitario: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Precio unitario"
+          value=""
+          onChange={() => {}}
+          rangeValue={{
+            min: columnFilters.precioUnitarioMin,
+            max: columnFilters.precioUnitarioMax,
+          }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({
+              ...prev,
+              precioUnitarioMin: min,
+              precioUnitarioMax: max,
+            }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "precioUnitario" ? sort.order : null}
+          onSortToggle={() => toggleSort("precioUnitario")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={formatPrecio(oferta.precioUnitario)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    cantidadDisponible: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Cantidad disp."
+          value=""
+          onChange={() => {}}
+          rangeValue={{
+            min: columnFilters.cantidadDisponibleMin,
+            max: columnFilters.cantidadDisponibleMax,
+          }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({
+              ...prev,
+              cantidadDisponibleMin: min,
+              cantidadDisponibleMax: max,
+            }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "cantidadDisponible" ? sort.order : null}
+          onSortToggle={() => toggleSort("cantidadDisponible")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
+          {oferta.cantidadDisponible ?? <span className="text-zinc-400 dark:text-zinc-600">—</span>}
+        </TableCell>
+      ),
+    },
+    fechaOferta: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Vigencia"
+          value={columnFilters.fechaOferta}
+          onChange={(v) => setColumnFilter("fechaOferta", v)}
+          sortDirection={sort?.campo === "fechaOferta" ? sort.order : null}
+          onSortToggle={() => toggleSort("fechaOferta")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={oferta.fechaOferta} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    fechaHasta: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Válida hasta"
+          value={columnFilters.vigencia}
+          onChange={(v) => setColumnFilter("vigencia", v)}
+          options={VIGENCIA_OPTIONS}
+          dateValue={columnFilters.fechaHasta}
+          onDateChange={(v) => setColumnFilter("fechaHasta", v)}
+          sortDirection={sort?.campo === "fechaHasta" ? sort.order : null}
+          onSortToggle={() => toggleSort("fechaHasta")}
+        />
+      ),
+      cell: (oferta) => (
+        <TableCell className="text-zinc-700 dark:text-zinc-300">
+          {oferta.fechaHasta ?? (
+            <span className="text-zinc-500 dark:text-zinc-500">Hasta agotar stock</span>
+          )}
+        </TableCell>
+      ),
+    },
+    estado: {
+      header: () => <TableHead>Estado</TableHead>,
+      cell: (oferta) => (
+        <TableCell>
+          <span className="flex items-center gap-1.5">
+            {(() => {
+              const estado = estadoOferta(oferta, hoy);
+              return <Badge variant={estado.variant}>{estado.label}</Badge>;
+            })()}
+            {oferta.eliminado && <Badge variant="destructive">Eliminada</Badge>}
+          </span>
+        </TableCell>
+      ),
+    },
+  };
+
+  const visibleColumnDefs = columnOrder
+    .filter((key) => !hiddenColumns.has(key))
+    .map((key) => ({ key, def: columnDefsByKey[key] }));
+
+  const colSpan = (puedeEditar ? 1 : 0) + 1 + visibleColumnDefs.length + 1;
 
   return (
     <>
@@ -349,6 +592,14 @@ export default function OfertasView() {
               Limpiar filtros
             </Button>
           )}
+          <ColumnVisibilityMenu
+            columns={OFERTAS_COLUMN_OPTIONS}
+            order={columnOrder}
+            hidden={hiddenColumns}
+            onReorder={setColumnOrder}
+            onToggle={toggleColumn}
+            onReset={resetColumnPrefs}
+          />
           <ExportarButton
             exportPath="/api/ofertas/export"
             getParams={buildExportParams}
@@ -375,55 +626,15 @@ export default function OfertasView() {
         </div>
       </section>
 
-      <div className="mb-2 flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
-        <span>{loading ? "Cargando…" : rangoResultados}</span>
-        <div className="flex items-center gap-3">
-          {data && data.total > 0 && (
-            <label className="flex items-center gap-1.5">
-              <span className="text-xs">Filas por página</span>
-              <Select
-                items={Object.fromEntries(PAGE_SIZES.map((n) => [String(n), String(n)]))}
-                value={String(pageSize)}
-                onValueChange={(v) => setPageSize(Number(v))}
-              >
-                <SelectTrigger size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZES.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-          )}
-          {data && data.totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={data.page <= 1}
-              >
-                Anterior
-              </Button>
-              <span>
-                Página {data.page} de {data.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                disabled={data.page >= data.totalPages}
-              >
-                Siguiente
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <TablePaginationBar
+        loading={loading}
+        data={data}
+        rangoResultados={rangoResultados}
+        pageSizeOptions={PAGE_SIZES}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        className="mb-2"
+      />
 
       {puedeEditar && selectedIds.size > 0 && (
         <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
@@ -489,110 +700,9 @@ export default function OfertasView() {
                 </TableHead>
               )}
               <TableHead aria-label="Imagen" />
-              <ColumnFilterHeader
-                label="Marca"
-                value={columnFilters.marca}
-                onChange={(v) => setColumnFilter("marca", v)}
-                sortDirection={sort?.campo === "marca" ? sort.order : null}
-                onSortToggle={() => toggleSort("marca")}
-              />
-              <ColumnFilterHeader
-                label="N° oferta"
-                value={columnFilters.numeroOferta}
-                onChange={(v) => setColumnFilter("numeroOferta", v)}
-                sortDirection={sort?.campo === "numeroOferta" ? sort.order : null}
-                onSortToggle={() => toggleSort("numeroOferta")}
-              />
-              <ColumnFilterHeader
-                label="SKU proveedor"
-                value={columnFilters.sku}
-                onChange={(v) => setColumnFilter("sku", v)}
-                sortDirection={sort?.campo === "sku" ? sort.order : null}
-                onSortToggle={() => toggleSort("sku")}
-              />
-              <ColumnFilterHeader
-                label="Descripción"
-                value={columnFilters.descripcion}
-                onChange={(v) => setColumnFilter("descripcion", v)}
-                sortDirection={sort?.campo === "descripcion" ? sort.order : null}
-                onSortToggle={() => toggleSort("descripcion")}
-              />
-              <ColumnFilterHeader
-                label="Desde cant."
-                value={columnFilters.desdeCantidad}
-                onChange={(v) => setColumnFilter("desdeCantidad", v)}
-                align="right"
-                sortDirection={sort?.campo === "desdeCantidad" ? sort.order : null}
-                onSortToggle={() => toggleSort("desdeCantidad")}
-              />
-              <ColumnFilterHeader
-                label="Descuento"
-                value=""
-                onChange={() => {}}
-                rangeValue={{ min: columnFilters.descuentoPctMin, max: columnFilters.descuentoPctMax }}
-                onRangeChange={(min, max) =>
-                  setColumnFilters((prev) => ({ ...prev, descuentoPctMin: min, descuentoPctMax: max }))
-                }
-                align="right"
-                sortDirection={sort?.campo === "descuentoPct" ? sort.order : null}
-                onSortToggle={() => toggleSort("descuentoPct")}
-              />
-              <ColumnFilterHeader
-                label="Precio unitario"
-                value=""
-                onChange={() => {}}
-                rangeValue={{
-                  min: columnFilters.precioUnitarioMin,
-                  max: columnFilters.precioUnitarioMax,
-                }}
-                onRangeChange={(min, max) =>
-                  setColumnFilters((prev) => ({
-                    ...prev,
-                    precioUnitarioMin: min,
-                    precioUnitarioMax: max,
-                  }))
-                }
-                align="right"
-                sortDirection={sort?.campo === "precioUnitario" ? sort.order : null}
-                onSortToggle={() => toggleSort("precioUnitario")}
-              />
-              <ColumnFilterHeader
-                label="Cantidad disp."
-                value=""
-                onChange={() => {}}
-                rangeValue={{
-                  min: columnFilters.cantidadDisponibleMin,
-                  max: columnFilters.cantidadDisponibleMax,
-                }}
-                onRangeChange={(min, max) =>
-                  setColumnFilters((prev) => ({
-                    ...prev,
-                    cantidadDisponibleMin: min,
-                    cantidadDisponibleMax: max,
-                  }))
-                }
-                align="right"
-                sortDirection={sort?.campo === "cantidadDisponible" ? sort.order : null}
-                onSortToggle={() => toggleSort("cantidadDisponible")}
-              />
-              <ColumnFilterHeader
-                label="Vigencia"
-                value={columnFilters.fechaOferta}
-                onChange={(v) => setColumnFilter("fechaOferta", v)}
-                sortDirection={sort?.campo === "fechaOferta" ? sort.order : null}
-                onSortToggle={() => toggleSort("fechaOferta")}
-              />
-              <ColumnFilterHeader
-                label="Válida hasta"
-                value={columnFilters.vigencia}
-                onChange={(v) => setColumnFilter("vigencia", v)}
-                options={VIGENCIA_OPTIONS}
-                dateValue={columnFilters.fechaHasta}
-                onDateChange={(v) => setColumnFilter("fechaHasta", v)}
-                sortDirection={sort?.campo === "fechaHasta" ? sort.order : null}
-                onSortToggle={() => toggleSort("fechaHasta")}
-              />
-              <TableHead>Estado</TableHead>
+              {visibleColumnDefs.map(({ key, def }) => (
+                <Fragment key={key}>{def.header()}</Fragment>
+              ))}
               <TableHead aria-label="Historial" />
             </TableRow>
           </TableHeader>
@@ -640,49 +750,9 @@ export default function OfertasView() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={oferta.marca} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={String(oferta.numeroOferta)} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={oferta.skuProveedor} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
-                      <HighlightText text={oferta.descripcion} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={String(oferta.desdeCantidad)} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={`${oferta.descuentoPct}%`} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
-                      <HighlightText text={formatPrecio(oferta.precioUnitario)} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                      {oferta.cantidadDisponible ?? (
-                        <span className="text-zinc-400 dark:text-zinc-600">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      <HighlightText text={oferta.fechaOferta} query={debouncedSearch} />
-                    </TableCell>
-                    <TableCell className="text-zinc-700 dark:text-zinc-300">
-                      {oferta.fechaHasta ?? (
-                        <span className="text-zinc-500 dark:text-zinc-500">Hasta agotar stock</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="flex items-center gap-1.5">
-                        {(() => {
-                          const estado = estadoOferta(oferta, hoy);
-                          return <Badge variant={estado.variant}>{estado.label}</Badge>;
-                        })()}
-                        {oferta.eliminado && <Badge variant="destructive">Eliminada</Badge>}
-                      </span>
-                    </TableCell>
+                    {visibleColumnDefs.map(({ key, def }) => (
+                      <Fragment key={key}>{def.cell(oferta)}</Fragment>
+                    ))}
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="ghost"
@@ -714,6 +784,16 @@ export default function OfertasView() {
           </TableBody>
         </Table>
       </div>
+
+      <TablePaginationBar
+        loading={loading}
+        data={data}
+        rangoResultados={rangoResultados}
+        pageSizeOptions={PAGE_SIZES}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        className="mt-2"
+      />
 
       {editOpen && selectedOferta && (
         <EditarOfertaDialog
