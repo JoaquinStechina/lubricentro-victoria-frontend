@@ -1,6 +1,6 @@
 # Lubricentro Victoria — Catálogo de proveedores
 
-Prototipo web para visualizar y filtrar el catálogo centralizado de listas de precios y ofertas de los proveedores del lubricentro (Bosch, Mobil, Tecfil, Wega, O'Cuatro, entre otros), ya normalizados a partir de sus archivos originales.
+Aplicación web para visualizar y filtrar el catálogo centralizado de listas de precios y ofertas de los proveedores del lubricentro (Bosch, Mobil, Tecfil, Wega, O'Cuatro, entre otros), ya normalizados a partir de sus archivos originales.
 
 ## Demo
 
@@ -139,6 +139,17 @@ Necesita `.env.local` con `NEXT_PUBLIC_API_URL` y `JWT_SECRET` (ver
 sembrado (`npm run seed:sysadmin` en `../backend`, ver su README).
 
 Abrí [http://localhost:3000](http://localhost:3000) — redirige a `/login`.
+
+## Despliegue
+
+En producción corre en Docker (`Dockerfile`, build standalone — requiere `output: "standalone"`
+en `next.config.ts`), detrás de un nginx que enruta por path sobre un único puerto público (sin
+dominio, acceso por IP pública) — arquitectura completa en `../infra/README.md`.
+
+`NEXT_PUBLIC_API_URL` se hornea en el bundle en build time, no en runtime: en el
+`docker-compose.yml` de `infra/` entra como build-arg, no como variable de entorno del
+contenedor. `JWT_SECRET`, en cambio, se lee en runtime (`proxy.ts` / `app/lib/session.ts`,
+server-side) y sí va en el `.env` del contenedor.
 
 ## Datos
 
