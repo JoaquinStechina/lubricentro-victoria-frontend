@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import { applyMappingPreviewOfertas } from "@/app/lib/applyMappingPreviewOfertas";
 import {
@@ -71,6 +72,7 @@ type ReviewTableOfertasProps = {
 // paralelos" del plan de ofertas: el shape de los datos y el paso extra de
 // metadata de archivo no calzan bien en una sola tabla genérica).
 export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOfertasProps) {
+  const router = useRouter();
   const { headers, rows: rawRows } = carga.filasExtraidas ?? { headers: [], rows: [] };
 
   const [metadata, setMetadata] = useState<OfertaMetadata>(carga.metadataOferta ?? {});
@@ -92,6 +94,9 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Etapa 5 (ver contexto.md): igual que ReviewTable.tsx, se piden una sola
   // vez al montar y no se recalculan si el usuario cambia el mapeo o la
@@ -189,6 +194,21 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handleCancelarCarga() {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await apiFetch(`/api/uploads/${carga.id}`, { method: "DELETE" });
+      setCancelDialogOpen(false);
+      router.push("/cargas");
+      router.refresh();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -394,9 +414,9 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button size="lg" />}>Confirmar carga</DialogTrigger>
+          <DialogTrigger render={<Button size="lg" disabled={cancelling} />}>Confirmar carga</DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>¿Confirmar carga de {incluidas.toLocaleString("es-AR")} ofertas?</DialogTitle>
@@ -411,6 +431,30 @@ export default function ReviewTableOfertas({ carga, onConfirmed }: ReviewTableOf
               </Button>
               <Button onClick={handleConfirm} disabled={confirming}>
                 {confirming ? "Guardando…" : "Confirmar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+          <DialogTrigger render={<Button size="lg" variant="destructive" disabled={confirming} />}>
+            Cancelar carga
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>¿Cancelar esta carga?</DialogTitle>
+              <DialogDescription>
+                Se elimina la carga y el archivo subido, y se descartan los datos revisados en esta
+                pantalla. Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            {cancelError && <p className="text-sm text-destructive">{cancelError}</p>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
+                Volver
+              </Button>
+              <Button variant="destructive" onClick={handleCancelarCarga} disabled={cancelling}>
+                {cancelling ? "Cancelando…" : "Confirmar"}
               </Button>
             </DialogFooter>
           </DialogContent>

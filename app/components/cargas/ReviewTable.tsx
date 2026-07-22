@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import { applyMappingPreview } from "@/app/lib/applyMappingPreview";
 import {
@@ -50,6 +51,7 @@ type ReviewTableProps = {
 };
 
 export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
+  const router = useRouter();
   const { headers, rows: rawRows } = carga.filasExtraidas ?? { headers: [], rows: [] };
   const mapeoSugerido = (carga.mapeoSugerido as ColumnMapping | null) ?? {};
 
@@ -69,6 +71,9 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Etapa 5 (ver contexto.md): chequeos determinísticos calculados por el
   // backend como paso aparte al abrir esta pantalla, no durante
@@ -164,6 +169,21 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function handleCancelarCarga() {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await apiFetch(`/api/uploads/${carga.id}`, { method: "DELETE" });
+      setCancelDialogOpen(false);
+      router.push("/cargas");
+      router.refresh();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -328,9 +348,9 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger render={<Button size="lg" />}>Confirmar carga</DialogTrigger>
+          <DialogTrigger render={<Button size="lg" disabled={cancelling} />}>Confirmar carga</DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>¿Confirmar carga de {incluidas.toLocaleString("es-AR")} productos?</DialogTitle>
@@ -345,6 +365,30 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
               </Button>
               <Button onClick={handleConfirm} disabled={confirming}>
                 {confirming ? "Guardando…" : "Confirmar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+          <DialogTrigger render={<Button size="lg" variant="destructive" disabled={confirming} />}>
+            Cancelar carga
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>¿Cancelar esta carga?</DialogTitle>
+              <DialogDescription>
+                Se elimina la carga y el archivo subido, y se descartan los datos revisados en esta
+                pantalla. Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            {cancelError && <p className="text-sm text-destructive">{cancelError}</p>}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
+                Volver
+              </Button>
+              <Button variant="destructive" onClick={handleCancelarCarga} disabled={cancelling}>
+                {cancelling ? "Cancelando…" : "Confirmar"}
               </Button>
             </DialogFooter>
           </DialogContent>
