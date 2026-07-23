@@ -40,6 +40,11 @@ const currencyFormatter = new Intl.NumberFormat("es-AR", {
   currency: "ARS",
 });
 
+// Descuento % no es moneda (no pasa por currencyFormatter): igual se limita
+// a 2 decimales acá, la fuente de verdad es el redondeo que ya hace el
+// backend al guardar, esto solo cubre datos viejos que hayan quedado con más.
+const porcentajeFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
+
 function formatFecha(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR");
 }
@@ -124,7 +129,7 @@ export default function HistorialOfertaDialog({
                         {item.numeroOferta}
                       </TableCell>
                       <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-                        {item.descuentoPct}%
+                        {porcentajeFormatter.format(item.descuentoPct)}%
                       </TableCell>
                       <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
                         {currencyFormatter.format(item.precioUnitario)}

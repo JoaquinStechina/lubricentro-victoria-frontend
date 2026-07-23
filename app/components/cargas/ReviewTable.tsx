@@ -134,6 +134,10 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
       return trimmed === "" ? NaN : Number(trimmed);
     };
     const pct = toNum(porcentajeGanancia);
+    // Evita que el resultado arrastre el error de coma flotante de JS (ej.
+    // 333.33 * 17.5 / 100 = 58.332750000000004) — todos los precios se
+    // guardan con como máximo 2 decimales.
+    const round2 = (n: number) => Math.round(n * 100) / 100;
     setRows((prev) =>
       preview.map((newRow, idx) => {
         const prevRow = prev[idx];
@@ -152,7 +156,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           const precioNeto = toNum(merged.precio_neto);
           const iva = toNum(merged.alicuota_iva);
           if (Number.isFinite(precioNeto) && Number.isFinite(iva)) {
-            merged.precio_con_iva = String(precioNeto + (precioNeto * iva) / 100);
+            merged.precio_con_iva = String(round2(precioNeto + (precioNeto * iva) / 100));
           }
         }
 
@@ -163,7 +167,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           const iva = toNum(merged.alicuota_iva);
           merged.precio_lista_con_iva =
             Number.isFinite(precioLista) && Number.isFinite(iva)
-              ? String(precioLista + (precioLista * iva) / 100)
+              ? String(round2(precioLista + (precioLista * iva) / 100))
               : "";
         } else {
           merged.precio_lista_con_iva = "";
@@ -175,7 +179,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           const precioConIva = toNum(merged.precio_con_iva);
           merged.precio_sugerido =
             Number.isFinite(pct) && Number.isFinite(precioConIva)
-              ? String(precioConIva + (precioConIva * pct) / 100)
+              ? String(round2(precioConIva + (precioConIva * pct) / 100))
               : "";
         }
         return merged;

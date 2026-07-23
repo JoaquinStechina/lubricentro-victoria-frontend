@@ -96,6 +96,13 @@ function formatPrecio(valor: number) {
   return currencyFormatter.format(valor);
 }
 
+// Descuento % no es moneda (no pasa por currencyFormatter): igual se limita
+// a 2 decimales acá, la fuente de verdad es el redondeo que ya hace el
+// backend al guardar, esto solo cubre datos viejos que hayan quedado con más.
+function formatPorcentaje(valor: number) {
+  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(valor);
+}
+
 // Fecha local en YYYY-MM-DD (en-CA da ese formato) — no usar toISOString(),
 // que es UTC y en Argentina marcaría como vencida una oferta que todavía
 // vence "hoy". Mismo criterio que hoyLocalISO() en el backend.
@@ -451,7 +458,7 @@ export default function OfertasView() {
       ),
       cell: (oferta) => (
         <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
-          <HighlightText text={`${oferta.descuentoPct}%`} query={debouncedSearch} />
+          <HighlightText text={`${formatPorcentaje(oferta.descuentoPct)}%`} query={debouncedSearch} />
         </TableCell>
       ),
     },

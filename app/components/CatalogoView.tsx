@@ -91,6 +91,14 @@ function formatPrecio(valor: number | null) {
   return currencyFormatter.format(valor);
 }
 
+// IVA % no es moneda (no pasa por currencyFormatter): igual se limita a 2
+// decimales acá, la fuente de verdad es el redondeo que ya hace el backend
+// al guardar, esto solo cubre datos viejos que hayan quedado con más.
+function formatPorcentaje(valor: number | null) {
+  if (valor === null || valor === undefined) return "—";
+  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(valor);
+}
+
 export default function CatalogoView() {
   const session = useSession();
   const puedeEditar = session?.rol === "ADMINISTRADOR" || session?.rol === "SYSADMIN";
@@ -544,7 +552,7 @@ export default function CatalogoView() {
       cell: (producto) => (
         <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
           <HighlightText
-            text={producto.alicuotaIva !== null ? String(producto.alicuotaIva) : "—"}
+            text={formatPorcentaje(producto.alicuotaIva)}
             query={debouncedSearch}
           />
         </TableCell>
