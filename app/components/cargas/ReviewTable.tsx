@@ -114,16 +114,26 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
   // Al cambiar un mapeo, recalcula la vista previa a partir de las filas
   // crudas — pero preserva cualquier celda que el usuario ya haya corregido
   // a mano (dirtyRef), en vez de pisarla con el nuevo valor derivado.
-  // También recalcula precio_sugerido a partir del % de ganancia cada vez
-  // que este cambia (o que el mapeo cambia el precio_con_iva de una fila),
-  // salvo que esa celda puntual también esté en dirtyRef.
+  // También recalcula, salvo que la celda puntual esté en dirtyRef:
+  // - precio_con_iva: si se mapeó la columna "IVA" (alicuota_iva), se
+  //   deriva de precio_neto + precio_neto * IVA/100 en vez de (o adicional
+  //   a) lo que haya venido de una columna mapeada directamente. Si falta
+  //   precio_neto o IVA en la fila, se deja el valor que ya tenía.
+  // - precio_lista_con_iva: mismo criterio pero a partir de precio_lista;
+  //   nunca se mapea directamente, así que sin IVA mapeada queda vacío.
+  // - precio_sugerido: precio_con_iva + precio_con_iva * % de ganancia/100
+  //   (el % lo carga el usuario en esta misma pantalla), usando el
+  //   precio_con_iva ya recalculado arriba si correspondía.
   useEffect(() => {
     const preview = applyMappingPreview(headers, rawRows, mapping);
+    const ivaMapeado = Object.values(mapping).includes("alicuota_iva");
     // Number("") es 0 (no NaN): tratamos "sin valor" como NaN a propósito
-    // para que precio_sugerido quede vacío en vez de calcular "0" cuando
-    // todavía no se cargó el % o la fila no tiene precio_con_iva.
-    const pctRaw = porcentajeGanancia.trim();
-    const pct = pctRaw === "" ? NaN : Number(pctRaw);
+    // para no calcular "0" cuando falta un dato.
+    const toNum = (raw: string | undefined) => {
+      const trimmed = (raw ?? "").trim();
+      return trimmed === "" ? NaN : Number(trimmed);
+    };
+    const pct = toNum(porcentajeGanancia);
     setRows((prev) =>
       preview.map((newRow, idx) => {
         const prevRow = prev[idx];
@@ -138,14 +148,34 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           }
         }
 
+        if (ivaMapeado && !dirtyRef.current.has(`${idx}:precio_con_iva`)) {
+          const precioNeto = toNum(merged.precio_neto);
+          const iva = toNum(merged.alicuota_iva);
+          if (Number.isFinite(precioNeto) && Number.isFinite(iva)) {
+            merged.precio_con_iva = String(precioNeto + (precioNeto * iva) / 100);
+          }
+        }
+
+        if (dirtyRef.current.has(`${idx}:precio_lista_con_iva`)) {
+          merged.precio_lista_con_iva = prevRow?.precio_lista_con_iva;
+        } else if (ivaMapeado) {
+          const precioLista = toNum(merged.precio_lista);
+          const iva = toNum(merged.alicuota_iva);
+          merged.precio_lista_con_iva =
+            Number.isFinite(precioLista) && Number.isFinite(iva)
+              ? String(precioLista + (precioLista * iva) / 100)
+              : "";
+        } else {
+          merged.precio_lista_con_iva = "";
+        }
+
         if (dirtyRef.current.has(`${idx}:precio_sugerido`)) {
           merged.precio_sugerido = prevRow?.precio_sugerido;
         } else {
-          const precioConIvaRaw = (merged.precio_con_iva ?? "").trim();
-          const precioConIva = precioConIvaRaw === "" ? NaN : Number(precioConIvaRaw);
+          const precioConIva = toNum(merged.precio_con_iva);
           merged.precio_sugerido =
             Number.isFinite(pct) && Number.isFinite(precioConIva)
-              ? String((precioConIva * pct) / 100)
+              ? String(precioConIva + (precioConIva * pct) / 100)
               : "";
         }
         return merged;
@@ -165,7 +195,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
 
   function handleCellChange(
     rowIdx: number,
-    field: CanonicalField | "precio_sugerido",
+    field: CanonicalField | "precio_sugerido" | "precio_lista_con_iva",
     value: string
   ) {
     setRows((prev) => {
@@ -241,8 +271,8 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           />
         </div>
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
-          Se aplica a todas las filas: Precio sugerido = Precio Neto C/IVA × % de ganancia / 100.
-          Se puede corregir a mano fila por fila.
+          Se aplica a todas las filas: Precio sugerido = Precio Neto C/IVA + (Precio Neto C/IVA × %
+          de ganancia / 100). Se puede corregir a mano fila por fila.
         </p>
       </section>
 
@@ -276,6 +306,11 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
             </div>
           ))}
         </div>
+        <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
+          Si mapeás una columna a &quot;IVA %&quot;, Precio Neto C/IVA y Precio Lista C/IVA se
+          calculan solos (precio + precio × IVA / 100) a partir de Precio neto y Precio Lista. Se
+          puede corregir a mano fila por fila.
+        </p>
       </section>
 
       <div className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
@@ -311,6 +346,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
               {CANONICAL_FIELDS.map((field) => (
                 <TableHead key={field}>{CANONICAL_FIELD_LABELS[field]}</TableHead>
               ))}
+              <TableHead>Precio Lista C/IVA</TableHead>
               <TableHead>Precio sugerido</TableHead>
               <TableHead>Datos sin mapear</TableHead>
               <TableHead>Advertencias</TableHead>
@@ -361,6 +397,17 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                     ))}
                     <TableCell>
                       <Input
+                        value={row.precio_lista_con_iva ?? ""}
+                        onChange={(e) =>
+                          handleCellChange(idx, "precio_lista_con_iva", e.target.value)
+                        }
+                        disabled={isExcluded}
+                        className="h-7 w-32 text-xs"
+                        inputMode="decimal"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
                         value={row.precio_sugerido ?? ""}
                         onChange={(e) => handleCellChange(idx, "precio_sugerido", e.target.value)}
                         disabled={isExcluded}
@@ -396,7 +443,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                   </TableRow>
                   {isExpanded && hasRawData && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
-                      <TableCell colSpan={CANONICAL_FIELDS.length + 4} className="whitespace-normal py-3">
+                      <TableCell colSpan={CANONICAL_FIELDS.length + 5} className="whitespace-normal py-3">
                         <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-zinc-800 dark:bg-black dark:text-zinc-200">
                           {JSON.stringify(row.raw_data, null, 2)}
                         </pre>

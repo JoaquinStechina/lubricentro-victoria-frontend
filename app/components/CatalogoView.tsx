@@ -52,6 +52,7 @@ const CATALOGO_COLUMN_OPTIONS: ColumnOption[] = [
   { key: "precioNeto", label: "Precio neto" },
   { key: "precioConIva", label: "Precio Neto C/IVA" },
   { key: "precioLista", label: "Precio Lista" },
+  { key: "precioListaConIva", label: "Precio Lista C/IVA" },
   { key: "precioSugerido", label: "Precio Sugerido" },
   { key: "alicuotaIva", label: "IVA %" },
   { key: "fechaVigencia", label: "Vigencia" },
@@ -70,6 +71,8 @@ const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   precioConIvaMax: "",
   precioListaMin: "",
   precioListaMax: "",
+  precioListaConIvaMin: "",
+  precioListaConIvaMax: "",
   precioSugeridoMin: "",
   precioSugeridoMax: "",
   alicuotaIva: "",
@@ -468,6 +471,34 @@ export default function CatalogoView() {
       cell: (producto) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
           <HighlightText text={formatPrecio(producto.precioLista)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    precioListaConIva: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Precio Lista C/IVA"
+          value=""
+          onChange={() => {}}
+          rangeValue={{
+            min: columnFilters.precioListaConIvaMin,
+            max: columnFilters.precioListaConIvaMax,
+          }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({
+              ...prev,
+              precioListaConIvaMin: min,
+              precioListaConIvaMax: max,
+            }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "precioListaConIva" ? sort.order : null}
+          onSortToggle={() => toggleSort("precioListaConIva")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={formatPrecio(producto.precioListaConIva)} query={debouncedSearch} />
         </TableCell>
       ),
     },
