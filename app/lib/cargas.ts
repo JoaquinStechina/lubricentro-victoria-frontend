@@ -11,6 +11,7 @@ export const CANONICAL_FIELDS = [
   "seccion",
   "precio_neto",
   "precio_con_iva",
+  "precio_lista",
   "alicuota_iva",
   "moneda",
   "unidad",
@@ -27,6 +28,7 @@ export const CANONICAL_FIELD_LABELS: Record<CanonicalField, string> = {
   seccion: "Sección",
   precio_neto: "Precio neto",
   precio_con_iva: "Precio c/IVA",
+  precio_lista: "Precio Lista",
   alicuota_iva: "IVA %",
   moneda: "Moneda",
   unidad: "Unidad",
@@ -101,6 +103,11 @@ export type ColumnMapping = Record<string, CanonicalField>;
 // lado del servidor, una sola vez, al confirmar.
 export type CanonicalRowInput = Partial<Record<CanonicalField, string>> & {
   raw_data?: Record<string, unknown>;
+  // Calculado en la pantalla de revisión a partir de precio_con_iva * un %
+  // de ganancia que carga el usuario ahí mismo — nunca se mapea desde una
+  // columna del archivo, por eso no es un CanonicalField (ver ReviewTable.tsx
+  // y backend/src/extraction/types.ts, CanonicalRowUpload).
+  precio_sugerido?: string;
 };
 
 // Etapa 5 (ver contexto.md): chequeos determinísticos que corre el backend

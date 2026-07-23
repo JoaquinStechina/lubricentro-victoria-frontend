@@ -66,6 +66,11 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
     dirtyRef.current = dirty;
   }, [dirty]);
 
+  // % de ganancia "de toda la carga": no viaja como CanonicalField (no se
+  // mapea desde ninguna columna), se usa acá nomás para derivar
+  // precio_sugerido en cada fila — ver useEffect más abajo.
+  const [porcentajeGanancia, setPorcentajeGanancia] = useState("");
+
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [confirming, setConfirming] = useState(false);
@@ -109,23 +114,45 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
   // Al cambiar un mapeo, recalcula la vista previa a partir de las filas
   // crudas — pero preserva cualquier celda que el usuario ya haya corregido
   // a mano (dirtyRef), en vez de pisarla con el nuevo valor derivado.
+  // También recalcula precio_sugerido a partir del % de ganancia cada vez
+  // que este cambia (o que el mapeo cambia el precio_con_iva de una fila),
+  // salvo que esa celda puntual también esté en dirtyRef.
   useEffect(() => {
     const preview = applyMappingPreview(headers, rawRows, mapping);
+    // Number("") es 0 (no NaN): tratamos "sin valor" como NaN a propósito
+    // para que precio_sugerido quede vacío en vez de calcular "0" cuando
+    // todavía no se cargó el % o la fila no tiene precio_con_iva.
+    const pctRaw = porcentajeGanancia.trim();
+    const pct = pctRaw === "" ? NaN : Number(pctRaw);
     setRows((prev) =>
       preview.map((newRow, idx) => {
         const prevRow = prev[idx];
-        if (!prevRow) return newRow;
-        const merged: CanonicalRowInput = { ...newRow };
-        for (const field of CANONICAL_FIELDS) {
-          if (dirtyRef.current.has(`${idx}:${field}`)) {
-            merged[field] = prevRow[field];
+        const merged: CanonicalRowInput = prevRow
+          ? { ...newRow }
+          : newRow;
+        if (prevRow) {
+          for (const field of CANONICAL_FIELDS) {
+            if (dirtyRef.current.has(`${idx}:${field}`)) {
+              merged[field] = prevRow[field];
+            }
           }
+        }
+
+        if (dirtyRef.current.has(`${idx}:precio_sugerido`)) {
+          merged.precio_sugerido = prevRow?.precio_sugerido;
+        } else {
+          const precioConIvaRaw = (merged.precio_con_iva ?? "").trim();
+          const precioConIva = precioConIvaRaw === "" ? NaN : Number(precioConIvaRaw);
+          merged.precio_sugerido =
+            Number.isFinite(pct) && Number.isFinite(precioConIva)
+              ? String((precioConIva * pct) / 100)
+              : "";
         }
         return merged;
       })
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapping]);
+  }, [mapping, porcentajeGanancia]);
 
   function handleMappingChange(header: string, value: string) {
     setMapping((prev) => {
@@ -136,7 +163,11 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
     });
   }
 
-  function handleCellChange(rowIdx: number, field: CanonicalField, value: string) {
+  function handleCellChange(
+    rowIdx: number,
+    field: CanonicalField | "precio_sugerido",
+    value: string
+  ) {
     setRows((prev) => {
       const next = [...prev];
       next[rowIdx] = { ...next[rowIdx], [field]: value };
@@ -195,6 +226,26 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          Precio sugerido
+        </h2>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">% de ganancia</span>
+          <Input
+            type="number"
+            value={porcentajeGanancia}
+            onChange={(e) => setPorcentajeGanancia(e.target.value)}
+            className="h-8 w-32 text-sm"
+            placeholder="Ej: 30"
+          />
+        </div>
+        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+          Se aplica a todas las filas: Precio sugerido = Precio Neto C/IVA × % de ganancia / 100.
+          Se puede corregir a mano fila por fila.
+        </p>
+      </section>
+
       <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
           Mapeo de columnas
@@ -260,6 +311,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
               {CANONICAL_FIELDS.map((field) => (
                 <TableHead key={field}>{CANONICAL_FIELD_LABELS[field]}</TableHead>
               ))}
+              <TableHead>Precio sugerido</TableHead>
               <TableHead>Datos sin mapear</TableHead>
               <TableHead>Advertencias</TableHead>
             </TableRow>
@@ -297,13 +349,25 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                           disabled={isExcluded}
                           className="h-7 w-32 text-xs"
                           inputMode={
-                            field === "precio_neto" || field === "precio_con_iva" || field === "alicuota_iva"
+                            field === "precio_neto" ||
+                            field === "precio_con_iva" ||
+                            field === "precio_lista" ||
+                            field === "alicuota_iva"
                               ? "decimal"
                               : "text"
                           }
                         />
                       </TableCell>
                     ))}
+                    <TableCell>
+                      <Input
+                        value={row.precio_sugerido ?? ""}
+                        onChange={(e) => handleCellChange(idx, "precio_sugerido", e.target.value)}
+                        disabled={isExcluded}
+                        className="h-7 w-32 text-xs"
+                        inputMode="decimal"
+                      />
+                    </TableCell>
                     <TableCell>
                       {hasRawData ? (
                         <button
@@ -332,7 +396,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
                   </TableRow>
                   {isExpanded && hasRawData && (
                     <TableRow className="bg-zinc-50 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-950">
-                      <TableCell colSpan={CANONICAL_FIELDS.length + 3} className="whitespace-normal py-3">
+                      <TableCell colSpan={CANONICAL_FIELDS.length + 4} className="whitespace-normal py-3">
                         <pre className="overflow-x-auto rounded bg-white p-3 text-xs text-zinc-800 dark:bg-black dark:text-zinc-200">
                           {JSON.stringify(row.raw_data, null, 2)}
                         </pre>

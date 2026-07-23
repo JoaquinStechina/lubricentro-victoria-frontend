@@ -12,6 +12,8 @@ export type Producto = {
   seccion: string | null;
   precioNeto: number | null;
   precioConIva: number | null;
+  precioLista: number | null;
+  precioSugerido: number | null;
   alicuotaIva: number | null;
   moneda: string;
   unidad: string | null;
@@ -36,6 +38,10 @@ export type ProductoColumnKey =
   | "precioNetoMax"
   | "precioConIvaMin"
   | "precioConIvaMax"
+  | "precioListaMin"
+  | "precioListaMax"
+  | "precioSugeridoMin"
+  | "precioSugeridoMax"
   | "alicuotaIva"
   | "fechaVigencia";
 
@@ -48,6 +54,8 @@ export const PRODUCTO_SINGLE_EDIT_FIELDS = [
   "seccion",
   "precioNeto",
   "precioConIva",
+  "precioLista",
+  "precioSugerido",
   "alicuotaIva",
   "moneda",
   "unidad",
@@ -61,6 +69,8 @@ export const PRODUCTO_BULK_EDIT_FIELDS = [
   "seccion",
   "precioNeto",
   "precioConIva",
+  "precioLista",
+  "precioSugerido",
   "alicuotaIva",
   "moneda",
   "unidad",
@@ -75,7 +85,9 @@ export const PRODUCTO_FIELD_LABELS: Record<ProductoSingleEditField, string> = {
   descripcion: "Descripción",
   seccion: "Sección",
   precioNeto: "Precio neto",
-  precioConIva: "Precio c/IVA",
+  precioConIva: "Precio Neto C/IVA",
+  precioLista: "Precio Lista",
+  precioSugerido: "Precio Sugerido",
   alicuotaIva: "IVA %",
   moneda: "Moneda",
   unidad: "Unidad",
@@ -85,5 +97,7 @@ export const PRODUCTO_FIELD_LABELS: Record<ProductoSingleEditField, string> = {
 export const PRODUCTO_NUMERIC_FIELDS = new Set<string>([
   "precioNeto",
   "precioConIva",
+  "precioLista",
+  "precioSugerido",
   "alicuotaIva",
 ]);

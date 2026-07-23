@@ -50,7 +50,9 @@ const CATALOGO_COLUMN_OPTIONS: ColumnOption[] = [
   { key: "descripcion", label: "Descripción" },
   { key: "seccion", label: "Sección" },
   { key: "precioNeto", label: "Precio neto" },
-  { key: "precioConIva", label: "Precio c/IVA" },
+  { key: "precioConIva", label: "Precio Neto C/IVA" },
+  { key: "precioLista", label: "Precio Lista" },
+  { key: "precioSugerido", label: "Precio Sugerido" },
   { key: "alicuotaIva", label: "IVA %" },
   { key: "fechaVigencia", label: "Vigencia" },
 ];
@@ -66,6 +68,10 @@ const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   precioNetoMax: "",
   precioConIvaMin: "",
   precioConIvaMax: "",
+  precioListaMin: "",
+  precioListaMax: "",
+  precioSugeridoMin: "",
+  precioSugeridoMax: "",
   alicuotaIva: "",
   fechaVigencia: "",
 };
@@ -412,7 +418,7 @@ export default function CatalogoView() {
     precioConIva: {
       header: () => (
         <ColumnFilterHeader
-          label="Precio c/IVA"
+          label="Precio Neto C/IVA"
           value=""
           onChange={() => {}}
           rangeValue={{
@@ -434,6 +440,62 @@ export default function CatalogoView() {
       cell: (producto) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
           <HighlightText text={formatPrecio(producto.precioConIva)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    precioLista: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Precio Lista"
+          value=""
+          onChange={() => {}}
+          rangeValue={{
+            min: columnFilters.precioListaMin,
+            max: columnFilters.precioListaMax,
+          }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({
+              ...prev,
+              precioListaMin: min,
+              precioListaMax: max,
+            }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "precioLista" ? sort.order : null}
+          onSortToggle={() => toggleSort("precioLista")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={formatPrecio(producto.precioLista)} query={debouncedSearch} />
+        </TableCell>
+      ),
+    },
+    precioSugerido: {
+      header: () => (
+        <ColumnFilterHeader
+          label="Precio Sugerido"
+          value=""
+          onChange={() => {}}
+          rangeValue={{
+            min: columnFilters.precioSugeridoMin,
+            max: columnFilters.precioSugeridoMax,
+          }}
+          onRangeChange={(min, max) =>
+            setColumnFilters((prev) => ({
+              ...prev,
+              precioSugeridoMin: min,
+              precioSugeridoMax: max,
+            }))
+          }
+          align="right"
+          sortDirection={sort?.campo === "precioSugerido" ? sort.order : null}
+          onSortToggle={() => toggleSort("precioSugerido")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
+          <HighlightText text={formatPrecio(producto.precioSugerido)} query={debouncedSearch} />
         </TableCell>
       ),
     },

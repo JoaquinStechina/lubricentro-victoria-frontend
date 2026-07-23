@@ -108,7 +108,7 @@ export default function HistorialProductoDialog({
                   <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                     <TableHead>Fecha de carga</TableHead>
                     <TableHead className="text-right">Precio neto</TableHead>
-                    <TableHead className="text-right">Precio c/IVA</TableHead>
+                    <TableHead className="text-right">Precio Neto C/IVA</TableHead>
                     <TableHead>Vigencia</TableHead>
                     <TableHead>Archivo</TableHead>
                     <TableHead>Estado</TableHead>
