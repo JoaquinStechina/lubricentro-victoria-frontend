@@ -67,6 +67,12 @@ export default function CargasPage() {
               >
                 Ver catálogo y ofertas
               </Link>
+              <Link
+                href="/cargas/auto-descargas"
+                className="text-sm text-primary hover:underline whitespace-nowrap"
+              >
+                Auto-descargas
+              </Link>
               <UserMenu />
             </div>
           </div>
