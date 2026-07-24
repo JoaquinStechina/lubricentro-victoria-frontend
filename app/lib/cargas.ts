@@ -156,6 +156,10 @@ export type Carga = {
   // Solo relevante si tipoDatos = "oferta": el usuario marcó al subir el
   // archivo que la oferta no tiene fecha de cierre ("hasta agotar stock").
   sinFechaLimite: boolean;
+  // Copiado de AutoDescargaMarca.porcentajeGanancia al crear la Carga desde
+  // el worker de auto-descarga; null para cargas manuales o de otros
+  // proveedores (ver ReviewTable.tsx).
+  porcentajeGananciaDefault: number | null;
   estado: CargaEstado;
   mensajeError: string | null;
   filasExtraidas: { headers: string[]; rows: ExtractedRow[] } | null;
