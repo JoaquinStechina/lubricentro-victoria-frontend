@@ -68,8 +68,12 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
 
   // % de ganancia "de toda la carga": no viaja como CanonicalField (no se
   // mapea desde ninguna columna), se usa acá nomás para derivar
-  // precio_sugerido en cada fila — ver useEffect más abajo.
-  const [porcentajeGanancia, setPorcentajeGanancia] = useState("");
+  // precio_sugerido en cada fila — ver useEffect más abajo. Si la carga
+  // viene de una auto-descarga (ver AutoDescargaMarca), arranca prellenado
+  // con el % configurado para esa marca; el revisor lo puede corregir igual.
+  const [porcentajeGanancia, setPorcentajeGanancia] = useState(
+    carga.porcentajeGananciaDefault != null ? String(carga.porcentajeGananciaDefault) : ""
+  );
 
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [page, setPage] = useState(1);
