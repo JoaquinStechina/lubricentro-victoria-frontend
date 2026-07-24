@@ -21,9 +21,11 @@ import { Switch } from "@/components/ui/switch";
 export default function EditarAutoDescargaDialog({
   fila,
   onUpdated,
+  disabled,
 }: {
   fila: AutoDescargaMarca;
   onUpdated: (fila: AutoDescargaMarca) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [marca, setMarca] = useState(fila.marca);
@@ -61,7 +63,7 @@ export default function EditarAutoDescargaDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
+      <DialogTrigger render={<Button variant="ghost" size="icon-sm" disabled={disabled} />}>
         <PencilIcon />
       </DialogTrigger>
       <DialogContent>

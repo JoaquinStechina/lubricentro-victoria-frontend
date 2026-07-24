@@ -154,8 +154,17 @@ export default function AutoDescargasView() {
                         <PlayIcon className="size-3.5" />
                         {probandoIds.has(fila.id) ? "Probando..." : "Probar ahora"}
                       </Button>
-                      <EditarAutoDescargaDialog fila={fila} onUpdated={upsert} />
-                      <Button variant="ghost" size="icon-sm" onClick={() => setEliminarId(fila.id)}>
+                      <EditarAutoDescargaDialog
+                        fila={fila}
+                        onUpdated={upsert}
+                        disabled={probandoIds.has(fila.id)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={probandoIds.has(fila.id)}
+                        onClick={() => setEliminarId(fila.id)}
+                      >
                         <TrashIcon className="size-3.5" />
                       </Button>
                     </div>
