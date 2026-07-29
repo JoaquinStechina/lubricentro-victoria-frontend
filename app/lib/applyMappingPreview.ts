@@ -22,6 +22,19 @@ function toDisplayString(value: unknown): string {
 // Mantener sincronizado con CAMPOS_CODIGO en backend/src/extraction/mapping.ts.
 const CAMPOS_CODIGO = new Set<CanonicalField>(["sku_interno", "sku_proveedor"]);
 
+// Campos numéricos: nunca se combinan concatenando texto (a diferencia de
+// descripción, no hay una noción razonable de "unir" dos precios) — el
+// backend limpia espacios antes de parsear un número, así que dos precios
+// concatenados con espacio terminan mezclados en un entero gigante (caso
+// real: ver CAMPOS_NUMERICOS en backend/src/extraction/mapping.ts).
+// Mantener sincronizado con ese archivo.
+const CAMPOS_NUMERICOS = new Set<CanonicalField>([
+  "precio_neto",
+  "precio_con_iva",
+  "precio_lista",
+  "alicuota_iva",
+]);
+
 export function applyMappingPreview(
   headers: string[],
   rows: ExtractedRow[],
@@ -46,12 +59,15 @@ export function applyMappingPreview(
     }
 
     // Si dos o más columnas mapean al mismo campo (ej. "Producto" y "Envase"
-    // -> descripcion), se concatenan en orden salteando valores vacíos.
+    // -> descripcion), se concatenan en orden salteando valores vacíos —
+    // salvo un campo numérico (CAMPOS_NUMERICOS), que nunca se concatena.
     // Mantener sincronizado con applyMapping en backend/src/extraction/mapping.ts.
     const canonical: Partial<Record<CanonicalField, string>> = {};
     for (const [destino, valores] of valoresPorDestino) {
       const limpios = valores.filter((v) => v !== "");
-      canonical[destino] = limpios.join(CAMPOS_CODIGO.has(destino) ? "" : " ");
+      canonical[destino] = CAMPOS_NUMERICOS.has(destino)
+        ? (limpios[0] ?? "")
+        : limpios.join(CAMPOS_CODIGO.has(destino) ? "" : " ");
     }
 
     // seccion/marca: si no vinieron de una columna mapeada, caen del campo

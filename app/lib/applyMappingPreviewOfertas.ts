@@ -17,6 +17,16 @@ function toDisplayString(value: unknown): string {
   return String(value).trim();
 }
 
+// Campos numéricos: nunca se combinan concatenando texto — ver
+// CAMPOS_NUMERICOS_OFERTA en backend/src/extraction/mappingOfertas.ts.
+// Mantener sincronizado con ese archivo.
+const CAMPOS_NUMERICOS_OFERTA = new Set<OfertaField>([
+  "desde_cantidad",
+  "descuento_pct",
+  "precio_unitario",
+  "cantidad_disponible",
+]);
+
 export function applyMappingPreviewOfertas(
   headers: string[],
   rows: ExtractedRow[],
@@ -40,11 +50,14 @@ export function applyMappingPreviewOfertas(
     }
 
     // Si dos o más columnas mapean al mismo campo, se concatenan en orden
-    // separadas por espacio. Mantener sincronizado con applyMappingOfertas en
+    // separadas por espacio — salvo un campo numérico
+    // (CAMPOS_NUMERICOS_OFERTA), que nunca se concatena. Mantener
+    // sincronizado con applyMappingOfertas en
     // backend/src/extraction/mappingOfertas.ts.
     const canonical: Partial<Record<OfertaField, string>> = {};
     for (const [destino, valores] of valoresPorDestino) {
-      canonical[destino] = valores.filter((v) => v !== "").join(" ");
+      const limpios = valores.filter((v) => v !== "");
+      canonical[destino] = CAMPOS_NUMERICOS_OFERTA.has(destino) ? (limpios[0] ?? "") : limpios.join(" ");
     }
 
     if (!canonical.marca && metadata.marca) canonical.marca = metadata.marca;
