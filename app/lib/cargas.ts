@@ -94,8 +94,10 @@ export type OfertaMetadata = {
 // originales del archivo del proveedor, valores sin normalizar.
 export type ExtractedRow = Record<string, unknown>;
 
-// columnaOrigen -> campoDestino.
-export type ColumnMapping = Record<string, CanonicalField>;
+// columnaOrigen -> lista de campoDestino. Mantener sincronizado con
+// backend/src/extraction/types.ts (un array de un solo elemento es el caso
+// de siempre, sin cambio de comportamiento).
+export type ColumnMapping = Record<string, CanonicalField[]>;
 
 // Fila ya en forma canónica (después de aplicar el mapeo). Los valores
 // numéricos/texto viajan como string hacia el backend — el parseo

@@ -16,6 +16,12 @@ function toDisplayString(value: unknown): string {
   return String(value).trim();
 }
 
+// Columnas que representan un código: al combinar varias columnas de origen
+// en este destino, se unen sin separador (reconstruye un código partido en
+// dos columnas). El resto de los campos sigue uniéndose con espacio.
+// Mantener sincronizado con CAMPOS_CODIGO en backend/src/extraction/mapping.ts.
+const CAMPOS_CODIGO = new Set<CanonicalField>(["sku_interno", "sku_proveedor"]);
+
 export function applyMappingPreview(
   headers: string[],
   rows: ExtractedRow[],
@@ -26,24 +32,26 @@ export function applyMappingPreview(
     const rawData: Record<string, unknown> = {};
 
     for (const h of headers) {
-      const destino = mapping[h];
+      const destinos = mapping[h];
       const valor = row[h];
-      if (destino) {
-        const lista = valoresPorDestino.get(destino) ?? [];
-        lista.push(toDisplayString(valor));
-        valoresPorDestino.set(destino, lista);
+      if (destinos && destinos.length > 0) {
+        for (const destino of destinos) {
+          const lista = valoresPorDestino.get(destino) ?? [];
+          lista.push(toDisplayString(valor));
+          valoresPorDestino.set(destino, lista);
+        }
       } else if (valor !== null && valor !== undefined && valor !== "") {
         rawData[h] = valor;
       }
     }
 
     // Si dos o más columnas mapean al mismo campo (ej. "Producto" y "Envase"
-    // -> descripcion), se concatenan en orden separadas por espacio,
-    // salteando valores vacíos. Mantener sincronizado con applyMapping en
-    // backend/src/extraction/mapping.ts.
+    // -> descripcion), se concatenan en orden salteando valores vacíos.
+    // Mantener sincronizado con applyMapping en backend/src/extraction/mapping.ts.
     const canonical: Partial<Record<CanonicalField, string>> = {};
     for (const [destino, valores] of valoresPorDestino) {
-      canonical[destino] = valores.filter((v) => v !== "").join(" ");
+      const limpios = valores.filter((v) => v !== "");
+      canonical[destino] = limpios.join(CAMPOS_CODIGO.has(destino) ? "" : " ");
     }
 
     // seccion/marca: si no vinieron de una columna mapeada, caen del campo
