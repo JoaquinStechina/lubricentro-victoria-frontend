@@ -18,7 +18,7 @@ const dateFormatter = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", tim
 function resultadoVariant(resultado: string | null): "secondary" | "default" | "destructive" {
   if (!resultado) return "secondary";
   if (resultado.startsWith("error")) return "destructive";
-  if (resultado === "carga_creada") return "default";
+  if (resultado === "carga_creada" || resultado === "publicado_automaticamente") return "default";
   return "secondary";
 }
 
@@ -131,9 +131,11 @@ export default function AutoDescargasView() {
                   <TableCell>
                     {fila.ultimoResultado ? (
                       <Badge variant={resultadoVariant(fila.ultimoResultado)}>
-                        {fila.ultimoResultado === "carga_creada" && fila.ultimaCargaId ? (
+                        {(fila.ultimoResultado === "carga_creada" ||
+                          fila.ultimoResultado === "publicado_automaticamente") &&
+                        fila.ultimaCargaId ? (
                           <Link href={`/cargas/${fila.ultimaCargaId}`} className="hover:underline">
-                            carga_creada
+                            {fila.ultimoResultado}
                           </Link>
                         ) : (
                           fila.ultimoResultado
