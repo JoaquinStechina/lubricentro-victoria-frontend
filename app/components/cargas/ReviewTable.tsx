@@ -45,6 +45,15 @@ const MAPPING_SELECT_ITEMS: Record<string, string> = {
   ...CANONICAL_FIELD_LABELS,
 };
 
+// Etiqueta distinta para el selector secundario (una columna puede mapear a
+// un segundo campo destino además del primero — ver mapeo uno-a-muchos en
+// backend/src/extraction/mapping.ts). Solo se muestra si ya hay un destino
+// primario elegido.
+const MAPPING_SELECT_ITEMS_SECUNDARIO: Record<string, string> = {
+  [NONE_VALUE]: "+ mapear también a...",
+  ...CANONICAL_FIELD_LABELS,
+};
+
 type ReviewTableProps = {
   carga: Carga;
   onConfirmed: (carga: Carga) => void;
@@ -130,7 +139,7 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
   //   precio_con_iva ya recalculado arriba si correspondía.
   useEffect(() => {
     const preview = applyMappingPreview(headers, rawRows, mapping);
-    const ivaMapeado = Object.values(mapping).includes("alicuota_iva");
+    const ivaMapeado = Object.values(mapping).some((destinos) => destinos.includes("alicuota_iva"));
     // Number("") es 0 (no NaN): tratamos "sin valor" como NaN a propósito
     // para no calcular "0" cuando falta un dato.
     const toNum = (raw: string | undefined) => {
@@ -192,11 +201,25 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapping, porcentajeGanancia]);
 
-  function handleMappingChange(header: string, value: string) {
+  function handleMappingPrimarioChange(header: string, value: string) {
     setMapping((prev) => {
       const next = { ...prev };
-      if (value === NONE_VALUE) delete next[header];
-      else next[header] = value as CanonicalField;
+      if (value === NONE_VALUE) {
+        delete next[header];
+      } else {
+        const segundo = next[header]?.[1];
+        next[header] = segundo ? [value as CanonicalField, segundo] : [value as CanonicalField];
+      }
+      return next;
+    });
+  }
+
+  function handleMappingSecundarioChange(header: string, value: string) {
+    setMapping((prev) => {
+      const primero = prev[header]?.[0];
+      if (!primero) return prev;
+      const next = { ...prev };
+      next[header] = value === NONE_VALUE ? [primero] : [primero, value as CanonicalField];
       return next;
     });
   }
@@ -296,21 +319,40 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
               </span>
               <Select
                 items={MAPPING_SELECT_ITEMS}
-                value={mapping[h] ?? NONE_VALUE}
-                onValueChange={(value) => handleMappingChange(h, value as string)}
+                value={mapping[h]?.[0] ?? NONE_VALUE}
+                onValueChange={(value) => handleMappingPrimarioChange(h, value as string)}
               >
                 <SelectTrigger size="sm" className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE_VALUE}>No mapear</SelectItem>
-                  {CANONICAL_FIELDS.map((field) => (
+                  {CANONICAL_FIELDS.filter((field) => field !== mapping[h]?.[1]).map((field) => (
                     <SelectItem key={field} value={field}>
                       {CANONICAL_FIELD_LABELS[field]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {mapping[h]?.[0] && (
+                <Select
+                  items={MAPPING_SELECT_ITEMS_SECUNDARIO}
+                  value={mapping[h]?.[1] ?? NONE_VALUE}
+                  onValueChange={(value) => handleMappingSecundarioChange(h, value as string)}
+                >
+                  <SelectTrigger size="sm" className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>+ mapear también a...</SelectItem>
+                    {CANONICAL_FIELDS.filter((field) => field !== mapping[h]?.[0]).map((field) => (
+                      <SelectItem key={field} value={field}>
+                        {CANONICAL_FIELD_LABELS[field]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           ))}
         </div>
