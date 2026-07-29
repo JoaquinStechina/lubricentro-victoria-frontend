@@ -100,11 +100,27 @@ token.
   ofertas — ver `../backend/README.md`) calculadas por el backend al abrir la pantalla; son solo
   informativas, no bloquean la confirmación. Requiere el backend corriendo
   (`NEXT_PUBLIC_API_URL`, default `http://localhost:4000`, ver `.env.local`).
-  - **Mapeo de columnas muchos-a-uno**: se puede asignar el mismo campo destino (ej.
-    "Descripción") a dos o más columnas de origen — los valores se concatenan con un espacio, en
-    el orden en que aparecen las columnas en el archivo, salteando vacíos
-    (`applyMappingPreview.ts` / `applyMappingPreviewOfertas.ts` en el frontend,
-    `applyMapping`/`applyMappingOfertas` en `../backend`, mismo criterio en los dos lados).
+  - **Mapeo de columnas uno-a-muchos**: cada columna de origen tiene un `<Select>` primario y,
+    debajo, un segundo `<Select>` opcional (`MAPPING_SELECT_ITEMS_SECUNDARIO`) para asignarle un
+    segundo campo destino a la vez (ej. una columna "Código" que llena `sku_interno` Y
+    `sku_proveedor` con el mismo valor) — los dos selects filtran mutuamente sus opciones para no
+    poder repetir el mismo destino en la misma columna. Sigue funcionando también al revés (varios
+    orígenes al mismo destino, ej. "Descripción" alimentada por dos columnas): los valores se
+    concatenan con un espacio, en el orden en que aparecen en el archivo, salteando vacíos — salvo
+    `sku_interno`/`sku_proveedor`, que se concatenan sin separador (reconstruyen un código partido
+    en dos columnas). Mismo criterio en los dos lados: `applyMappingPreview.ts` /
+    `applyMappingPreviewOfertas.ts` en el frontend (vista previa instantánea, antes de confirmar),
+    `applyMapping`/`applyMappingOfertas` en `../backend` (ver su README, sección "Extracción").
+- **Auto-descargas** (`/cargas/auto-descargas`, `ADMINISTRADOR`+, `AutoDescargasView.tsx`): CRUD de
+  las marcas que se descargan solas a diario (`GET`/`POST`/`PATCH`/`DELETE /api/auto-descargas` —
+  ver `../backend/README.md`, sección "Automatización") — proveedor, marca, % de ganancia default
+  y un switch para activar/desactivar sin borrar la fila. "Probar ahora" corre esa fila al toque
+  (~10-20s si el proveedor usa portal por Playwright, más rápido si es descarga directa) y
+  refresca "Última corrida"/"Resultado" en la tabla sin recargar la página. El badge de Resultado
+  linkea a la carga creada (`/cargas/:id`) cuando el resultado es `carga_creada` o
+  `publicado_automaticamente` — este último significa que, además de crearse, la carga ya se
+  publicó sola sin pasar por revisión humana (ver "Auto-publicación condicionada" en
+  `../backend/README.md`); el link sirve igual para poder auditar qué se publicó.
   - **"Hasta agotar stock"** (solo tipo "Oferta"): switch en `UploadForm.tsx`, debajo del
     selector Catálogo/Oferta. Si está activo, se manda `sinFechaLimite: true` al crear la carga y
     la IA no intenta inferir una fecha de vencimiento del documento (evita alucinaciones) —
