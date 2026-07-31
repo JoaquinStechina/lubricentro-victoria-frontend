@@ -2,6 +2,16 @@
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { History, ImageIcon, Plus } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
 import { useColumnPrefs } from "@/app/lib/useColumnPrefs";
@@ -10,6 +20,7 @@ import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/ColumnVisibilityMenu";
 import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
+import SortableResizableHead from "@/app/components/SortableResizableHead";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import EditarOfertaDialog from "@/app/components/ofertas/EditarOfertaDialog";
 import NuevaOfertaDialog from "@/app/components/ofertas/NuevaOfertaDialog";
@@ -59,6 +70,21 @@ const OFERTAS_COLUMN_OPTIONS: ColumnOption[] = [
   { key: "estado", label: "Estado" },
 ];
 const OFERTAS_DEFAULT_COLUMN_ORDER = OFERTAS_COLUMN_OPTIONS.map((c) => c.key);
+
+// Ver mismo criterio en CatalogoView.tsx.
+const OFERTAS_DEFAULT_WIDTHS: Record<string, number> = {
+  marca: 130,
+  numeroOferta: 100,
+  sku: 130,
+  descripcion: 260,
+  desdeCantidad: 100,
+  descuentoPct: 100,
+  precioUnitario: 130,
+  cantidadDisponible: 110,
+  fechaOferta: 110,
+  fechaHasta: 140,
+  estado: 110,
+};
 
 const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
   marca: "",
@@ -150,10 +176,26 @@ export default function OfertasView() {
   const {
     order: columnOrder,
     hidden: hiddenColumns,
+    widths: columnWidths,
     setOrder: setColumnOrder,
     toggleColumn,
+    setWidth: setColumnWidth,
     reset: resetColumnPrefs,
   } = useColumnPrefs("lv:columnas:ofertas", OFERTAS_DEFAULT_COLUMN_ORDER);
+
+  // Ver mismo criterio en CatalogoView.tsx.
+  const columnDragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  function handleColumnDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = columnOrder.indexOf(String(active.id));
+    const newIndex = columnOrder.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    setColumnOrder(arrayMove(columnOrder, oldIndex, newIndex));
+  }
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [debouncedColumnFilters, setDebouncedColumnFilters] = useState(
@@ -362,13 +404,20 @@ export default function OfertasView() {
   const columnDefsByKey: Record<string, { header: () => ReactNode; cell: (oferta: Oferta) => ReactNode }> = {
     marca: {
       header: () => (
-        <ColumnFilterHeader
-          label="Marca"
-          value={columnFilters.marca}
-          onChange={(v) => setColumnFilter("marca", v)}
-          sortDirection={sort?.campo === "marca" ? sort.order : null}
-          onSortToggle={() => toggleSort("marca")}
-        />
+        <SortableResizableHead
+          columnKey="marca"
+          width={columnWidths.marca ?? OFERTAS_DEFAULT_WIDTHS.marca}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.marca}
+          onResize={(px) => setColumnWidth("marca", px)}
+        >
+          <ColumnFilterHeader
+            label="Marca"
+            value={columnFilters.marca}
+            onChange={(v) => setColumnFilter("marca", v)}
+            sortDirection={sort?.campo === "marca" ? sort.order : null}
+            onSortToggle={() => toggleSort("marca")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -378,13 +427,20 @@ export default function OfertasView() {
     },
     numeroOferta: {
       header: () => (
-        <ColumnFilterHeader
-          label="N° oferta"
-          value={columnFilters.numeroOferta}
-          onChange={(v) => setColumnFilter("numeroOferta", v)}
-          sortDirection={sort?.campo === "numeroOferta" ? sort.order : null}
-          onSortToggle={() => toggleSort("numeroOferta")}
-        />
+        <SortableResizableHead
+          columnKey="numeroOferta"
+          width={columnWidths.numeroOferta ?? OFERTAS_DEFAULT_WIDTHS.numeroOferta}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.numeroOferta}
+          onResize={(px) => setColumnWidth("numeroOferta", px)}
+        >
+          <ColumnFilterHeader
+            label="N° oferta"
+            value={columnFilters.numeroOferta}
+            onChange={(v) => setColumnFilter("numeroOferta", v)}
+            sortDirection={sort?.campo === "numeroOferta" ? sort.order : null}
+            onSortToggle={() => toggleSort("numeroOferta")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -394,13 +450,20 @@ export default function OfertasView() {
     },
     sku: {
       header: () => (
-        <ColumnFilterHeader
-          label="SKU proveedor"
-          value={columnFilters.sku}
-          onChange={(v) => setColumnFilter("sku", v)}
-          sortDirection={sort?.campo === "sku" ? sort.order : null}
-          onSortToggle={() => toggleSort("sku")}
-        />
+        <SortableResizableHead
+          columnKey="sku"
+          width={columnWidths.sku ?? OFERTAS_DEFAULT_WIDTHS.sku}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.sku}
+          onResize={(px) => setColumnWidth("sku", px)}
+        >
+          <ColumnFilterHeader
+            label="SKU proveedor"
+            value={columnFilters.sku}
+            onChange={(v) => setColumnFilter("sku", v)}
+            sortDirection={sort?.campo === "sku" ? sort.order : null}
+            onSortToggle={() => toggleSort("sku")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
@@ -410,13 +473,20 @@ export default function OfertasView() {
     },
     descripcion: {
       header: () => (
-        <ColumnFilterHeader
-          label="Descripción"
-          value={columnFilters.descripcion}
-          onChange={(v) => setColumnFilter("descripcion", v)}
-          sortDirection={sort?.campo === "descripcion" ? sort.order : null}
-          onSortToggle={() => toggleSort("descripcion")}
-        />
+        <SortableResizableHead
+          columnKey="descripcion"
+          width={columnWidths.descripcion ?? OFERTAS_DEFAULT_WIDTHS.descripcion}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.descripcion}
+          onResize={(px) => setColumnWidth("descripcion", px)}
+        >
+          <ColumnFilterHeader
+            label="Descripción"
+            value={columnFilters.descripcion}
+            onChange={(v) => setColumnFilter("descripcion", v)}
+            sortDirection={sort?.campo === "descripcion" ? sort.order : null}
+            onSortToggle={() => toggleSort("descripcion")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
@@ -426,14 +496,22 @@ export default function OfertasView() {
     },
     desdeCantidad: {
       header: () => (
-        <ColumnFilterHeader
-          label="Desde cant."
-          value={columnFilters.desdeCantidad}
-          onChange={(v) => setColumnFilter("desdeCantidad", v)}
+        <SortableResizableHead
+          columnKey="desdeCantidad"
+          width={columnWidths.desdeCantidad ?? OFERTAS_DEFAULT_WIDTHS.desdeCantidad}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.desdeCantidad}
+          onResize={(px) => setColumnWidth("desdeCantidad", px)}
           align="right"
-          sortDirection={sort?.campo === "desdeCantidad" ? sort.order : null}
-          onSortToggle={() => toggleSort("desdeCantidad")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Desde cant."
+            value={columnFilters.desdeCantidad}
+            onChange={(v) => setColumnFilter("desdeCantidad", v)}
+            align="right"
+            sortDirection={sort?.campo === "desdeCantidad" ? sort.order : null}
+            onSortToggle={() => toggleSort("desdeCantidad")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
@@ -443,18 +521,26 @@ export default function OfertasView() {
     },
     descuentoPct: {
       header: () => (
-        <ColumnFilterHeader
-          label="Descuento"
-          value=""
-          onChange={() => {}}
-          rangeValue={{ min: columnFilters.descuentoPctMin, max: columnFilters.descuentoPctMax }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({ ...prev, descuentoPctMin: min, descuentoPctMax: max }))
-          }
+        <SortableResizableHead
+          columnKey="descuentoPct"
+          width={columnWidths.descuentoPct ?? OFERTAS_DEFAULT_WIDTHS.descuentoPct}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.descuentoPct}
+          onResize={(px) => setColumnWidth("descuentoPct", px)}
           align="right"
-          sortDirection={sort?.campo === "descuentoPct" ? sort.order : null}
-          onSortToggle={() => toggleSort("descuentoPct")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Descuento"
+            value=""
+            onChange={() => {}}
+            rangeValue={{ min: columnFilters.descuentoPctMin, max: columnFilters.descuentoPctMax }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({ ...prev, descuentoPctMin: min, descuentoPctMax: max }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "descuentoPct" ? sort.order : null}
+            onSortToggle={() => toggleSort("descuentoPct")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
@@ -464,25 +550,33 @@ export default function OfertasView() {
     },
     precioUnitario: {
       header: () => (
-        <ColumnFilterHeader
-          label="Precio unitario"
-          value=""
-          onChange={() => {}}
-          rangeValue={{
-            min: columnFilters.precioUnitarioMin,
-            max: columnFilters.precioUnitarioMax,
-          }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({
-              ...prev,
-              precioUnitarioMin: min,
-              precioUnitarioMax: max,
-            }))
-          }
+        <SortableResizableHead
+          columnKey="precioUnitario"
+          width={columnWidths.precioUnitario ?? OFERTAS_DEFAULT_WIDTHS.precioUnitario}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.precioUnitario}
+          onResize={(px) => setColumnWidth("precioUnitario", px)}
           align="right"
-          sortDirection={sort?.campo === "precioUnitario" ? sort.order : null}
-          onSortToggle={() => toggleSort("precioUnitario")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Precio unitario"
+            value=""
+            onChange={() => {}}
+            rangeValue={{
+              min: columnFilters.precioUnitarioMin,
+              max: columnFilters.precioUnitarioMax,
+            }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({
+                ...prev,
+                precioUnitarioMin: min,
+                precioUnitarioMax: max,
+              }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "precioUnitario" ? sort.order : null}
+            onSortToggle={() => toggleSort("precioUnitario")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
@@ -492,25 +586,33 @@ export default function OfertasView() {
     },
     cantidadDisponible: {
       header: () => (
-        <ColumnFilterHeader
-          label="Cantidad disp."
-          value=""
-          onChange={() => {}}
-          rangeValue={{
-            min: columnFilters.cantidadDisponibleMin,
-            max: columnFilters.cantidadDisponibleMax,
-          }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({
-              ...prev,
-              cantidadDisponibleMin: min,
-              cantidadDisponibleMax: max,
-            }))
-          }
+        <SortableResizableHead
+          columnKey="cantidadDisponible"
+          width={columnWidths.cantidadDisponible ?? OFERTAS_DEFAULT_WIDTHS.cantidadDisponible}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.cantidadDisponible}
+          onResize={(px) => setColumnWidth("cantidadDisponible", px)}
           align="right"
-          sortDirection={sort?.campo === "cantidadDisponible" ? sort.order : null}
-          onSortToggle={() => toggleSort("cantidadDisponible")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Cantidad disp."
+            value=""
+            onChange={() => {}}
+            rangeValue={{
+              min: columnFilters.cantidadDisponibleMin,
+              max: columnFilters.cantidadDisponibleMax,
+            }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({
+                ...prev,
+                cantidadDisponibleMin: min,
+                cantidadDisponibleMax: max,
+              }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "cantidadDisponible" ? sort.order : null}
+            onSortToggle={() => toggleSort("cantidadDisponible")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
@@ -520,13 +622,20 @@ export default function OfertasView() {
     },
     fechaOferta: {
       header: () => (
-        <ColumnFilterHeader
-          label="Vigencia"
-          value={columnFilters.fechaOferta}
-          onChange={(v) => setColumnFilter("fechaOferta", v)}
-          sortDirection={sort?.campo === "fechaOferta" ? sort.order : null}
-          onSortToggle={() => toggleSort("fechaOferta")}
-        />
+        <SortableResizableHead
+          columnKey="fechaOferta"
+          width={columnWidths.fechaOferta ?? OFERTAS_DEFAULT_WIDTHS.fechaOferta}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.fechaOferta}
+          onResize={(px) => setColumnWidth("fechaOferta", px)}
+        >
+          <ColumnFilterHeader
+            label="Vigencia"
+            value={columnFilters.fechaOferta}
+            onChange={(v) => setColumnFilter("fechaOferta", v)}
+            sortDirection={sort?.campo === "fechaOferta" ? sort.order : null}
+            onSortToggle={() => toggleSort("fechaOferta")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -536,16 +645,23 @@ export default function OfertasView() {
     },
     fechaHasta: {
       header: () => (
-        <ColumnFilterHeader
-          label="Válida hasta"
-          value={columnFilters.vigencia}
-          onChange={(v) => setColumnFilter("vigencia", v)}
-          options={VIGENCIA_OPTIONS}
-          dateValue={columnFilters.fechaHasta}
-          onDateChange={(v) => setColumnFilter("fechaHasta", v)}
-          sortDirection={sort?.campo === "fechaHasta" ? sort.order : null}
-          onSortToggle={() => toggleSort("fechaHasta")}
-        />
+        <SortableResizableHead
+          columnKey="fechaHasta"
+          width={columnWidths.fechaHasta ?? OFERTAS_DEFAULT_WIDTHS.fechaHasta}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.fechaHasta}
+          onResize={(px) => setColumnWidth("fechaHasta", px)}
+        >
+          <ColumnFilterHeader
+            label="Válida hasta"
+            value={columnFilters.vigencia}
+            onChange={(v) => setColumnFilter("vigencia", v)}
+            options={VIGENCIA_OPTIONS}
+            dateValue={columnFilters.fechaHasta}
+            onDateChange={(v) => setColumnFilter("fechaHasta", v)}
+            sortDirection={sort?.campo === "fechaHasta" ? sort.order : null}
+            onSortToggle={() => toggleSort("fechaHasta")}
+          />
+        </SortableResizableHead>
       ),
       cell: (oferta) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -556,7 +672,16 @@ export default function OfertasView() {
       ),
     },
     estado: {
-      header: () => <TableHead>Estado</TableHead>,
+      header: () => (
+        <SortableResizableHead
+          columnKey="estado"
+          width={columnWidths.estado ?? OFERTAS_DEFAULT_WIDTHS.estado}
+          defaultWidth={OFERTAS_DEFAULT_WIDTHS.estado}
+          onResize={(px) => setColumnWidth("estado", px)}
+        >
+          Estado
+        </SortableResizableHead>
+      ),
       cell: (oferta) => (
         <TableCell>
           <span className="flex items-center gap-1.5">
@@ -693,11 +818,11 @@ export default function OfertasView() {
       )}
 
       <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <Table className="min-w-[900px]">
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               {puedeEditar && (
-                <TableHead>
+                <TableHead className="w-10">
                   <Checkbox
                     checked={allSelected}
                     indeterminate={someSelected}
@@ -706,11 +831,22 @@ export default function OfertasView() {
                   />
                 </TableHead>
               )}
-              <TableHead aria-label="Imagen" />
-              {visibleColumnDefs.map(({ key, def }) => (
-                <Fragment key={key}>{def.header()}</Fragment>
-              ))}
-              <TableHead aria-label="Historial" />
+              <TableHead aria-label="Imagen" className="w-14" />
+              <DndContext
+                sensors={columnDragSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleColumnDragEnd}
+              >
+                <SortableContext
+                  items={visibleColumnDefs.map(({ key }) => key)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {visibleColumnDefs.map(({ key, def }) => (
+                    <Fragment key={key}>{def.header()}</Fragment>
+                  ))}
+                </SortableContext>
+              </DndContext>
+              <TableHead aria-label="Historial" className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>

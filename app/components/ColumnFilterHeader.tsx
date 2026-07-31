@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TableHead } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 const SELECT_ALL_VALUE = "__all__";
@@ -82,168 +81,169 @@ export default function ColumnFilterHeader({
   }
 
   return (
-    <TableHead className={align === "right" ? "text-right" : undefined}>
-      <div
-        className={cn(
-          // justify-end (no flex-row-reverse): empuja el grupo al borde
-          // derecho de la celda sin invertir el orden de los ítems — el
-          // ícono de filtro siempre queda a la derecha del de orden, tanto
-          // en columnas alineadas a la izquierda como a la derecha.
-          "flex items-center gap-1",
-          align === "right" && "justify-end"
-        )}
-      >
-        {onSortToggle ? (
-          <button
-            type="button"
-            onClick={onSortToggle}
-            className="flex items-center gap-0.5 hover:text-foreground"
-            aria-label={`Ordenar por ${label.toLowerCase()}`}
-          >
-            <span>{label}</span>
-            {sortDirection === "asc" ? (
-              <ArrowUp className="size-3 text-foreground" />
-            ) : sortDirection === "desc" ? (
-              <ArrowDown className="size-3 text-foreground" />
-            ) : (
-              <ChevronsUpDown className="size-3 text-muted-foreground/50" />
-            )}
-          </button>
-        ) : (
-          <span>{label}</span>
-        )}
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className={cn(
-                  "relative",
-                  active ? "text-foreground" : "text-muted-foreground/60"
-                )}
-              />
-            }
-          >
-            <Filter className="size-3" />
-            {active && (
-              <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-primary" />
-            )}
-          </PopoverTrigger>
-          <PopoverContent
-            className={cn("w-56", searchOptions ? "p-0" : "p-2")}
-            align={align === "right" ? "end" : "start"}
-          >
-            {searchOptions ? (
-              <Command>
-                <CommandInput placeholder={`Buscar ${label.toLowerCase()}…`} />
-                <CommandList>
-                  <CommandEmpty>Sin resultados.</CommandEmpty>
-                  <CommandGroup>
+    // Ya no envuelve en <TableHead>: eso lo hace SortableResizableHead
+    // (el <th> real, con ancho/drag/resize) para que este componente se
+    // pueda anidar adentro sin duplicar el tag — ver CatalogoView/OfertasView.
+    <div
+      className={cn(
+        // justify-end (no flex-row-reverse): empuja el grupo al borde
+        // derecho de la celda sin invertir el orden de los ítems — el
+        // ícono de filtro siempre queda a la derecha del de orden, tanto
+        // en columnas alineadas a la izquierda como a la derecha.
+        "flex min-w-0 items-center gap-1",
+        align === "right" && "justify-end"
+      )}
+    >
+      {onSortToggle ? (
+        <button
+          type="button"
+          onClick={onSortToggle}
+          className="flex min-w-0 items-center gap-0.5 hover:text-foreground"
+          aria-label={`Ordenar por ${label.toLowerCase()}`}
+        >
+          <span className="truncate">{label}</span>
+          {sortDirection === "asc" ? (
+            <ArrowUp className="size-3 shrink-0 text-foreground" />
+          ) : sortDirection === "desc" ? (
+            <ArrowDown className="size-3 shrink-0 text-foreground" />
+          ) : (
+            <ChevronsUpDown className="size-3 shrink-0 text-muted-foreground/50" />
+          )}
+        </button>
+      ) : (
+        <span className="truncate">{label}</span>
+      )}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className={cn(
+                "relative",
+                active ? "text-foreground" : "text-muted-foreground/60"
+              )}
+            />
+          }
+        >
+          <Filter className="size-3" />
+          {active && (
+            <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-primary" />
+          )}
+        </PopoverTrigger>
+        <PopoverContent
+          className={cn("w-56", searchOptions ? "p-0" : "p-2")}
+          align={align === "right" ? "end" : "start"}
+        >
+          {searchOptions ? (
+            <Command>
+              <CommandInput placeholder={`Buscar ${label.toLowerCase()}…`} />
+              <CommandList>
+                <CommandEmpty>Sin resultados.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value={SELECT_ALL_VALUE}
+                    onSelect={() => {
+                      onChange("");
+                      setOpen(false);
+                    }}
+                  >
+                    <CheckIcon
+                      className={cn("size-3.5", value === "" ? "opacity-100" : "opacity-0")}
+                    />
+                    Todas
+                  </CommandItem>
+                  {searchOptions.map((opcion) => (
                     <CommandItem
-                      value={SELECT_ALL_VALUE}
+                      key={opcion}
+                      value={opcion}
                       onSelect={() => {
-                        onChange("");
+                        onChange(opcion);
                         setOpen(false);
                       }}
                     >
                       <CheckIcon
-                        className={cn("size-3.5", value === "" ? "opacity-100" : "opacity-0")}
+                        className={cn("size-3.5", value === opcion ? "opacity-100" : "opacity-0")}
                       />
-                      Todas
+                      {opcion}
                     </CommandItem>
-                    {searchOptions.map((opcion) => (
-                      <CommandItem
-                        key={opcion}
-                        value={opcion}
-                        onSelect={() => {
-                          onChange(opcion);
-                          setOpen(false);
-                        }}
-                      >
-                        <CheckIcon
-                          className={cn("size-3.5", value === opcion ? "opacity-100" : "opacity-0")}
-                        />
-                        {opcion}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            ) : options ? (
-              <Select
-                items={{
-                  [SELECT_ALL_VALUE]: "Todas",
-                  ...Object.fromEntries(options.map((o) => [o.value, o.label])),
-                }}
-                value={value || SELECT_ALL_VALUE}
-                onValueChange={(v) =>
-                  onChange(v === SELECT_ALL_VALUE ? "" : (v as string))
-                }
-              >
-                <SelectTrigger size="sm" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SELECT_ALL_VALUE}>Todas</SelectItem>
-                  {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            ) : rangeValue && onRangeChange ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  autoFocus
-                  type="number"
-                  value={rangeValue.min}
-                  onChange={(e) => onRangeChange(e.target.value, rangeValue.max)}
-                  placeholder="Mín"
-                  className="h-8"
-                />
-                <span className="text-xs text-muted-foreground">–</span>
-                <Input
-                  type="number"
-                  value={rangeValue.max}
-                  onChange={(e) => onRangeChange(rangeValue.min, e.target.value)}
-                  placeholder="Máx"
-                  className="h-8"
-                />
-              </div>
-            ) : (
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          ) : options ? (
+            <Select
+              items={{
+                [SELECT_ALL_VALUE]: "Todas",
+                ...Object.fromEntries(options.map((o) => [o.value, o.label])),
+              }}
+              value={value || SELECT_ALL_VALUE}
+              onValueChange={(v) =>
+                onChange(v === SELECT_ALL_VALUE ? "" : (v as string))
+              }
+            >
+              <SelectTrigger size="sm" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_ALL_VALUE}>Todas</SelectItem>
+                {options.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : rangeValue && onRangeChange ? (
+            <div className="flex items-center gap-2">
               <Input
                 autoFocus
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={`Filtrar ${label.toLowerCase()}…`}
+                type="number"
+                value={rangeValue.min}
+                onChange={(e) => onRangeChange(e.target.value, rangeValue.max)}
+                placeholder="Mín"
                 className="h-8"
               />
-            )}
-            {onDateChange && (
-              <div className="mt-1.5 flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Fecha exacta</span>
-                <Input
-                  type="date"
-                  value={dateValue ?? ""}
-                  onChange={(e) => onDateChange(e.target.value)}
-                  className="h-8"
-                />
-              </div>
-            )}
-            {active && !searchOptions && (
-              <button
-                type="button"
-                onClick={limpiar}
-                className="mt-1.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                Limpiar filtro
-              </button>
-            )}
-          </PopoverContent>
-        </Popover>
-      </div>
-    </TableHead>
+              <span className="text-xs text-muted-foreground">–</span>
+              <Input
+                type="number"
+                value={rangeValue.max}
+                onChange={(e) => onRangeChange(rangeValue.min, e.target.value)}
+                placeholder="Máx"
+                className="h-8"
+              />
+            </div>
+          ) : (
+            <Input
+              autoFocus
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={`Filtrar ${label.toLowerCase()}…`}
+              className="h-8"
+            />
+          )}
+          {onDateChange && (
+            <div className="mt-1.5 flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Fecha exacta</span>
+              <Input
+                type="date"
+                value={dateValue ?? ""}
+                onChange={(e) => onDateChange(e.target.value)}
+                className="h-8"
+              />
+            </div>
+          )}
+          {active && !searchOptions && (
+            <button
+              type="button"
+              onClick={limpiar}
+              className="mt-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Limpiar filtro
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

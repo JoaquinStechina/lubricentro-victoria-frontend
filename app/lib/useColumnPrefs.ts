@@ -2,9 +2,13 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 
-type Prefs = { order: string[]; hidden: string[] };
+// widths: overrides por columna (px) sobre el ancho por defecto que define
+// cada vista (CatalogoView/OfertasView) — acá solo se persiste la
+// excepción, el default en sí no lo conoce este hook.
+type Prefs = { order: string[]; hidden: string[]; widths: Record<string, number> };
 
 const EMPTY_HIDDEN: string[] = [];
+const EMPTY_WIDTHS: Record<string, number> = {};
 
 // Cache en memoria por storageKey: getSnapshot debe devolver la misma
 // referencia si nada cambió (contrato de useSyncExternalStore), así que el
@@ -19,7 +23,7 @@ const serverSnapshotCache = new Map<string, Prefs>();
 function getServerSnapshot(storageKey: string, defaultOrder: string[]): Prefs {
   let snapshot = serverSnapshotCache.get(storageKey);
   if (!snapshot) {
-    snapshot = { order: defaultOrder, hidden: EMPTY_HIDDEN };
+    snapshot = { order: defaultOrder, hidden: EMPTY_HIDDEN, widths: EMPTY_WIDTHS };
     serverSnapshotCache.set(storageKey, snapshot);
   }
   return snapshot;
@@ -28,16 +32,24 @@ function getServerSnapshot(storageKey: string, defaultOrder: string[]): Prefs {
 function readFromStorage(storageKey: string, defaultOrder: string[]): Prefs {
   try {
     const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return { order: defaultOrder, hidden: EMPTY_HIDDEN };
+    if (!raw) return { order: defaultOrder, hidden: EMPTY_HIDDEN, widths: EMPTY_WIDTHS };
     const parsed = JSON.parse(raw) as Partial<Prefs>;
     const savedOrder = Array.isArray(parsed.order) ? parsed.order.filter((k) => defaultOrder.includes(k)) : [];
     // Columnas nuevas (agregadas después de que el usuario guardó sus
     // preferencias) se agregan al final en vez de quedar escondidas.
     const faltantes = defaultOrder.filter((k) => !savedOrder.includes(k));
     const hidden = Array.isArray(parsed.hidden) ? parsed.hidden.filter((k) => defaultOrder.includes(k)) : [];
-    return { order: [...savedOrder, ...faltantes], hidden };
+    const widths =
+      parsed.widths && typeof parsed.widths === "object" && !Array.isArray(parsed.widths)
+        ? Object.fromEntries(
+            Object.entries(parsed.widths).filter(
+              ([k, v]) => defaultOrder.includes(k) && typeof v === "number" && Number.isFinite(v)
+            )
+          )
+        : EMPTY_WIDTHS;
+    return { order: [...savedOrder, ...faltantes], hidden, widths };
   } catch {
-    return { order: defaultOrder, hidden: EMPTY_HIDDEN };
+    return { order: defaultOrder, hidden: EMPTY_HIDDEN, widths: EMPTY_WIDTHS };
   }
 }
 
@@ -86,7 +98,7 @@ export function useColumnPrefs(storageKey: string, defaultOrder: string[]) {
 
   const setOrder = useCallback(
     (nextOrder: string[]) => {
-      setPrefs(storageKey, { order: nextOrder, hidden: getSnapshot(storageKey, defaultOrder).hidden });
+      setPrefs(storageKey, { ...getSnapshot(storageKey, defaultOrder), order: nextOrder });
     },
     [storageKey, defaultOrder]
   );
@@ -97,7 +109,21 @@ export function useColumnPrefs(storageKey: string, defaultOrder: string[]) {
       const nextHidden = current.hidden.includes(key)
         ? current.hidden.filter((k) => k !== key)
         : [...current.hidden, key];
-      setPrefs(storageKey, { order: current.order, hidden: nextHidden });
+      setPrefs(storageKey, { ...current, hidden: nextHidden });
+    },
+    [storageKey, defaultOrder]
+  );
+
+  // px === null borra el override (vuelve al default que maneja la vista) —
+  // lo usa el doble click en el handle de resize para "restablecer" una
+  // columna sin tener que resetear el resto de las preferencias.
+  const setWidth = useCallback(
+    (key: string, px: number | null) => {
+      const current = getSnapshot(storageKey, defaultOrder);
+      const nextWidths = { ...current.widths };
+      if (px === null) delete nextWidths[key];
+      else nextWidths[key] = px;
+      setPrefs(storageKey, { ...current, widths: nextWidths });
     },
     [storageKey, defaultOrder]
   );
@@ -109,14 +135,16 @@ export function useColumnPrefs(storageKey: string, defaultOrder: string[]) {
     } catch {
       // Ver comentario en setPrefs().
     }
-    setPrefs(storageKey, { order: defaultOrder, hidden: EMPTY_HIDDEN });
+    setPrefs(storageKey, { order: defaultOrder, hidden: EMPTY_HIDDEN, widths: EMPTY_WIDTHS });
   }, [storageKey, defaultOrder]);
 
   return {
     order: prefs.order,
     hidden: useMemo(() => new Set(prefs.hidden), [prefs.hidden]),
+    widths: prefs.widths,
     setOrder,
     toggleColumn,
+    setWidth,
     reset,
   };
 }

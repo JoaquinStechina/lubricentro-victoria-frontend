@@ -2,6 +2,16 @@
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { History, ImageIcon, Plus } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
 import { useColumnPrefs } from "@/app/lib/useColumnPrefs";
@@ -10,6 +20,7 @@ import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/ColumnVisibilityMenu";
 import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
+import SortableResizableHead from "@/app/components/SortableResizableHead";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
 import NuevoProductoDialog from "@/app/components/catalogo/NuevoProductoDialog";
@@ -59,6 +70,25 @@ const CATALOGO_COLUMN_OPTIONS: ColumnOption[] = [
   { key: "fechaVigencia", label: "Vigencia" },
 ];
 const CATALOGO_DEFAULT_COLUMN_ORDER = CATALOGO_COLUMN_OPTIONS.map((c) => c.key);
+
+// Ancho inicial (px) de cada columna de datos — el usuario lo puede
+// arrastrar desde ahí (ver SortableResizableHead); doble click en el
+// handle de resize vuelve a este valor.
+const CATALOGO_DEFAULT_WIDTHS: Record<string, number> = {
+  proveedor: 140,
+  marca: 130,
+  sku: 130,
+  skuProveedor: 130,
+  descripcion: 260,
+  seccion: 130,
+  precioNeto: 120,
+  precioConIva: 140,
+  precioLista: 120,
+  precioListaConIva: 140,
+  precioSugerido: 130,
+  alicuotaIva: 80,
+  fechaVigencia: 110,
+};
 
 const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   proveedor: "",
@@ -141,10 +171,28 @@ export default function CatalogoView() {
   const {
     order: columnOrder,
     hidden: hiddenColumns,
+    widths: columnWidths,
     setOrder: setColumnOrder,
     toggleColumn,
+    setWidth: setColumnWidth,
     reset: resetColumnPrefs,
   } = useColumnPrefs("lv:columnas:catalogo", CATALOGO_DEFAULT_COLUMN_ORDER);
+
+  // Mismo sensor que ColumnVisibilityMenu (distancia mínima para no comerse
+  // un click en el grip por accidente) — acá reordena arrastrando el <th>
+  // en vivo en vez de una fila en el menú aislado.
+  const columnDragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  function handleColumnDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = columnOrder.indexOf(String(active.id));
+    const newIndex = columnOrder.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    setColumnOrder(arrayMove(columnOrder, oldIndex, newIndex));
+  }
 
   // Debounce los campos de texto para no disparar un fetch por cada tecla.
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -322,13 +370,20 @@ export default function CatalogoView() {
   const columnDefsByKey: Record<string, { header: () => ReactNode; cell: (producto: Producto) => ReactNode }> = {
     proveedor: {
       header: () => (
-        <ColumnFilterHeader
-          label="Proveedor"
-          value={columnFilters.proveedor}
-          onChange={(v) => setColumnFilter("proveedor", v)}
-          sortDirection={sort?.campo === "proveedor" ? sort.order : null}
-          onSortToggle={() => toggleSort("proveedor")}
-        />
+        <SortableResizableHead
+          columnKey="proveedor"
+          width={columnWidths.proveedor ?? CATALOGO_DEFAULT_WIDTHS.proveedor}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.proveedor}
+          onResize={(px) => setColumnWidth("proveedor", px)}
+        >
+          <ColumnFilterHeader
+            label="Proveedor"
+            value={columnFilters.proveedor}
+            onChange={(v) => setColumnFilter("proveedor", v)}
+            sortDirection={sort?.campo === "proveedor" ? sort.order : null}
+            onSortToggle={() => toggleSort("proveedor")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -341,13 +396,20 @@ export default function CatalogoView() {
     },
     marca: {
       header: () => (
-        <ColumnFilterHeader
-          label="Marca"
-          value={columnFilters.marca}
-          onChange={(v) => setColumnFilter("marca", v)}
-          sortDirection={sort?.campo === "marca" ? sort.order : null}
-          onSortToggle={() => toggleSort("marca")}
-        />
+        <SortableResizableHead
+          columnKey="marca"
+          width={columnWidths.marca ?? CATALOGO_DEFAULT_WIDTHS.marca}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.marca}
+          onResize={(px) => setColumnWidth("marca", px)}
+        >
+          <ColumnFilterHeader
+            label="Marca"
+            value={columnFilters.marca}
+            onChange={(v) => setColumnFilter("marca", v)}
+            sortDirection={sort?.campo === "marca" ? sort.order : null}
+            onSortToggle={() => toggleSort("marca")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -357,13 +419,20 @@ export default function CatalogoView() {
     },
     sku: {
       header: () => (
-        <ColumnFilterHeader
-          label="SKU interno"
-          value={columnFilters.sku}
-          onChange={(v) => setColumnFilter("sku", v)}
-          sortDirection={sort?.campo === "sku" ? sort.order : null}
-          onSortToggle={() => toggleSort("sku")}
-        />
+        <SortableResizableHead
+          columnKey="sku"
+          width={columnWidths.sku ?? CATALOGO_DEFAULT_WIDTHS.sku}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.sku}
+          onResize={(px) => setColumnWidth("sku", px)}
+        >
+          <ColumnFilterHeader
+            label="SKU interno"
+            value={columnFilters.sku}
+            onChange={(v) => setColumnFilter("sku", v)}
+            sortDirection={sort?.campo === "sku" ? sort.order : null}
+            onSortToggle={() => toggleSort("sku")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
@@ -376,13 +445,20 @@ export default function CatalogoView() {
     },
     skuProveedor: {
       header: () => (
-        <ColumnFilterHeader
-          label="SKU proveedor"
-          value={columnFilters.skuProveedor}
-          onChange={(v) => setColumnFilter("skuProveedor", v)}
-          sortDirection={sort?.campo === "skuProveedor" ? sort.order : null}
-          onSortToggle={() => toggleSort("skuProveedor")}
-        />
+        <SortableResizableHead
+          columnKey="skuProveedor"
+          width={columnWidths.skuProveedor ?? CATALOGO_DEFAULT_WIDTHS.skuProveedor}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.skuProveedor}
+          onResize={(px) => setColumnWidth("skuProveedor", px)}
+        >
+          <ColumnFilterHeader
+            label="SKU proveedor"
+            value={columnFilters.skuProveedor}
+            onChange={(v) => setColumnFilter("skuProveedor", v)}
+            sortDirection={sort?.campo === "skuProveedor" ? sort.order : null}
+            onSortToggle={() => toggleSort("skuProveedor")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
@@ -392,13 +468,20 @@ export default function CatalogoView() {
     },
     descripcion: {
       header: () => (
-        <ColumnFilterHeader
-          label="Descripción"
-          value={columnFilters.descripcion}
-          onChange={(v) => setColumnFilter("descripcion", v)}
-          sortDirection={sort?.campo === "descripcion" ? sort.order : null}
-          onSortToggle={() => toggleSort("descripcion")}
-        />
+        <SortableResizableHead
+          columnKey="descripcion"
+          width={columnWidths.descripcion ?? CATALOGO_DEFAULT_WIDTHS.descripcion}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.descripcion}
+          onResize={(px) => setColumnWidth("descripcion", px)}
+        >
+          <ColumnFilterHeader
+            label="Descripción"
+            value={columnFilters.descripcion}
+            onChange={(v) => setColumnFilter("descripcion", v)}
+            sortDirection={sort?.campo === "descripcion" ? sort.order : null}
+            onSortToggle={() => toggleSort("descripcion")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">
@@ -408,14 +491,21 @@ export default function CatalogoView() {
     },
     seccion: {
       header: () => (
-        <ColumnFilterHeader
-          label="Sección"
-          value={columnFilters.seccion}
-          onChange={(v) => setColumnFilter("seccion", v)}
-          searchOptions={secciones}
-          sortDirection={sort?.campo === "seccion" ? sort.order : null}
-          onSortToggle={() => toggleSort("seccion")}
-        />
+        <SortableResizableHead
+          columnKey="seccion"
+          width={columnWidths.seccion ?? CATALOGO_DEFAULT_WIDTHS.seccion}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.seccion}
+          onResize={(px) => setColumnWidth("seccion", px)}
+        >
+          <ColumnFilterHeader
+            label="Sección"
+            value={columnFilters.seccion}
+            onChange={(v) => setColumnFilter("seccion", v)}
+            searchOptions={secciones}
+            sortDirection={sort?.campo === "seccion" ? sort.order : null}
+            onSortToggle={() => toggleSort("seccion")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -425,18 +515,26 @@ export default function CatalogoView() {
     },
     precioNeto: {
       header: () => (
-        <ColumnFilterHeader
-          label="Precio neto"
-          value=""
-          onChange={() => {}}
-          rangeValue={{ min: columnFilters.precioNetoMin, max: columnFilters.precioNetoMax }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({ ...prev, precioNetoMin: min, precioNetoMax: max }))
-          }
+        <SortableResizableHead
+          columnKey="precioNeto"
+          width={columnWidths.precioNeto ?? CATALOGO_DEFAULT_WIDTHS.precioNeto}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.precioNeto}
+          onResize={(px) => setColumnWidth("precioNeto", px)}
           align="right"
-          sortDirection={sort?.campo === "precioNeto" ? sort.order : null}
-          onSortToggle={() => toggleSort("precioNeto")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Precio neto"
+            value=""
+            onChange={() => {}}
+            rangeValue={{ min: columnFilters.precioNetoMin, max: columnFilters.precioNetoMax }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({ ...prev, precioNetoMin: min, precioNetoMax: max }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "precioNeto" ? sort.order : null}
+            onSortToggle={() => toggleSort("precioNeto")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
@@ -446,25 +544,33 @@ export default function CatalogoView() {
     },
     precioConIva: {
       header: () => (
-        <ColumnFilterHeader
-          label="Precio Neto C/IVA"
-          value=""
-          onChange={() => {}}
-          rangeValue={{
-            min: columnFilters.precioConIvaMin,
-            max: columnFilters.precioConIvaMax,
-          }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({
-              ...prev,
-              precioConIvaMin: min,
-              precioConIvaMax: max,
-            }))
-          }
+        <SortableResizableHead
+          columnKey="precioConIva"
+          width={columnWidths.precioConIva ?? CATALOGO_DEFAULT_WIDTHS.precioConIva}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.precioConIva}
+          onResize={(px) => setColumnWidth("precioConIva", px)}
           align="right"
-          sortDirection={sort?.campo === "precioConIva" ? sort.order : null}
-          onSortToggle={() => toggleSort("precioConIva")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Precio Neto C/IVA"
+            value=""
+            onChange={() => {}}
+            rangeValue={{
+              min: columnFilters.precioConIvaMin,
+              max: columnFilters.precioConIvaMax,
+            }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({
+                ...prev,
+                precioConIvaMin: min,
+                precioConIvaMax: max,
+              }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "precioConIva" ? sort.order : null}
+            onSortToggle={() => toggleSort("precioConIva")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
@@ -474,25 +580,33 @@ export default function CatalogoView() {
     },
     precioLista: {
       header: () => (
-        <ColumnFilterHeader
-          label="Precio Lista"
-          value=""
-          onChange={() => {}}
-          rangeValue={{
-            min: columnFilters.precioListaMin,
-            max: columnFilters.precioListaMax,
-          }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({
-              ...prev,
-              precioListaMin: min,
-              precioListaMax: max,
-            }))
-          }
+        <SortableResizableHead
+          columnKey="precioLista"
+          width={columnWidths.precioLista ?? CATALOGO_DEFAULT_WIDTHS.precioLista}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.precioLista}
+          onResize={(px) => setColumnWidth("precioLista", px)}
           align="right"
-          sortDirection={sort?.campo === "precioLista" ? sort.order : null}
-          onSortToggle={() => toggleSort("precioLista")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Precio Lista"
+            value=""
+            onChange={() => {}}
+            rangeValue={{
+              min: columnFilters.precioListaMin,
+              max: columnFilters.precioListaMax,
+            }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({
+                ...prev,
+                precioListaMin: min,
+                precioListaMax: max,
+              }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "precioLista" ? sort.order : null}
+            onSortToggle={() => toggleSort("precioLista")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
@@ -502,25 +616,33 @@ export default function CatalogoView() {
     },
     precioListaConIva: {
       header: () => (
-        <ColumnFilterHeader
-          label="Precio Lista C/IVA"
-          value=""
-          onChange={() => {}}
-          rangeValue={{
-            min: columnFilters.precioListaConIvaMin,
-            max: columnFilters.precioListaConIvaMax,
-          }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({
-              ...prev,
-              precioListaConIvaMin: min,
-              precioListaConIvaMax: max,
-            }))
-          }
+        <SortableResizableHead
+          columnKey="precioListaConIva"
+          width={columnWidths.precioListaConIva ?? CATALOGO_DEFAULT_WIDTHS.precioListaConIva}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.precioListaConIva}
+          onResize={(px) => setColumnWidth("precioListaConIva", px)}
           align="right"
-          sortDirection={sort?.campo === "precioListaConIva" ? sort.order : null}
-          onSortToggle={() => toggleSort("precioListaConIva")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Precio Lista C/IVA"
+            value=""
+            onChange={() => {}}
+            rangeValue={{
+              min: columnFilters.precioListaConIvaMin,
+              max: columnFilters.precioListaConIvaMax,
+            }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({
+                ...prev,
+                precioListaConIvaMin: min,
+                precioListaConIvaMax: max,
+              }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "precioListaConIva" ? sort.order : null}
+            onSortToggle={() => toggleSort("precioListaConIva")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
@@ -530,25 +652,33 @@ export default function CatalogoView() {
     },
     precioSugerido: {
       header: () => (
-        <ColumnFilterHeader
-          label="Precio Sugerido"
-          value=""
-          onChange={() => {}}
-          rangeValue={{
-            min: columnFilters.precioSugeridoMin,
-            max: columnFilters.precioSugeridoMax,
-          }}
-          onRangeChange={(min, max) =>
-            setColumnFilters((prev) => ({
-              ...prev,
-              precioSugeridoMin: min,
-              precioSugeridoMax: max,
-            }))
-          }
+        <SortableResizableHead
+          columnKey="precioSugerido"
+          width={columnWidths.precioSugerido ?? CATALOGO_DEFAULT_WIDTHS.precioSugerido}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.precioSugerido}
+          onResize={(px) => setColumnWidth("precioSugerido", px)}
           align="right"
-          sortDirection={sort?.campo === "precioSugerido" ? sort.order : null}
-          onSortToggle={() => toggleSort("precioSugerido")}
-        />
+        >
+          <ColumnFilterHeader
+            label="Precio Sugerido"
+            value=""
+            onChange={() => {}}
+            rangeValue={{
+              min: columnFilters.precioSugeridoMin,
+              max: columnFilters.precioSugeridoMax,
+            }}
+            onRangeChange={(min, max) =>
+              setColumnFilters((prev) => ({
+                ...prev,
+                precioSugeridoMin: min,
+                precioSugeridoMax: max,
+              }))
+            }
+            align="right"
+            sortDirection={sort?.campo === "precioSugerido" ? sort.order : null}
+            onSortToggle={() => toggleSort("precioSugerido")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-right text-zinc-900 dark:text-zinc-100">
@@ -558,14 +688,22 @@ export default function CatalogoView() {
     },
     alicuotaIva: {
       header: () => (
-        <ColumnFilterHeader
-          label="IVA %"
-          value={columnFilters.alicuotaIva}
-          onChange={(v) => setColumnFilter("alicuotaIva", v)}
+        <SortableResizableHead
+          columnKey="alicuotaIva"
+          width={columnWidths.alicuotaIva ?? CATALOGO_DEFAULT_WIDTHS.alicuotaIva}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.alicuotaIva}
+          onResize={(px) => setColumnWidth("alicuotaIva", px)}
           align="right"
-          sortDirection={sort?.campo === "alicuotaIva" ? sort.order : null}
-          onSortToggle={() => toggleSort("alicuotaIva")}
-        />
+        >
+          <ColumnFilterHeader
+            label="IVA %"
+            value={columnFilters.alicuotaIva}
+            onChange={(v) => setColumnFilter("alicuotaIva", v)}
+            align="right"
+            sortDirection={sort?.campo === "alicuotaIva" ? sort.order : null}
+            onSortToggle={() => toggleSort("alicuotaIva")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
@@ -578,13 +716,20 @@ export default function CatalogoView() {
     },
     fechaVigencia: {
       header: () => (
-        <ColumnFilterHeader
-          label="Vigencia"
-          value={columnFilters.fechaVigencia}
-          onChange={(v) => setColumnFilter("fechaVigencia", v)}
-          sortDirection={sort?.campo === "fechaVigencia" ? sort.order : null}
-          onSortToggle={() => toggleSort("fechaVigencia")}
-        />
+        <SortableResizableHead
+          columnKey="fechaVigencia"
+          width={columnWidths.fechaVigencia ?? CATALOGO_DEFAULT_WIDTHS.fechaVigencia}
+          defaultWidth={CATALOGO_DEFAULT_WIDTHS.fechaVigencia}
+          onResize={(px) => setColumnWidth("fechaVigencia", px)}
+        >
+          <ColumnFilterHeader
+            label="Vigencia"
+            value={columnFilters.fechaVigencia}
+            onChange={(v) => setColumnFilter("fechaVigencia", v)}
+            sortDirection={sort?.campo === "fechaVigencia" ? sort.order : null}
+            onSortToggle={() => toggleSort("fechaVigencia")}
+          />
+        </SortableResizableHead>
       ),
       cell: (producto) => (
         <TableCell className="text-zinc-700 dark:text-zinc-300">
@@ -686,11 +831,11 @@ export default function CatalogoView() {
       )}
 
       <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <Table className="min-w-[900px]">
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               {puedeEditar && (
-                <TableHead>
+                <TableHead className="w-10">
                   <Checkbox
                     checked={allSelected}
                     indeterminate={someSelected}
@@ -699,11 +844,22 @@ export default function CatalogoView() {
                   />
                 </TableHead>
               )}
-              <TableHead aria-label="Imagen" />
-              {visibleColumnDefs.map(({ key, def }) => (
-                <Fragment key={key}>{def.header()}</Fragment>
-              ))}
-              <TableHead aria-label="Historial" />
+              <TableHead aria-label="Imagen" className="w-14" />
+              <DndContext
+                sensors={columnDragSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleColumnDragEnd}
+              >
+                <SortableContext
+                  items={visibleColumnDefs.map(({ key }) => key)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {visibleColumnDefs.map(({ key, def }) => (
+                    <Fragment key={key}>{def.header()}</Fragment>
+                  ))}
+                </SortableContext>
+              </DndContext>
+              <TableHead aria-label="Historial" className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
