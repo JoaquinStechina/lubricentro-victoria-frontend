@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import { ImageIcon, XIcon } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import {
@@ -9,6 +9,7 @@ import {
   PRODUCTO_SINGLE_EDIT_FIELDS,
   type Producto,
 } from "@/app/lib/productos";
+import { useCalculoPrecios } from "@/app/components/catalogo/useCalculoPrecios";
 import ProveedorCombobox from "@/app/components/ProveedorCombobox";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,12 @@ export default function NuevoProductoDialog({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    porcentajeGanancia,
+    setPorcentajeGanancia,
+    handleFieldChange,
+    reset: resetCalculo,
+  } = useCalculoPrecios(values, setValues);
 
   useEffect(() => {
     return () => {
@@ -64,6 +71,7 @@ export default function NuevoProductoDialog({
       });
       setError(null);
     }
+    resetCalculo();
     onOpenChange(next);
   }
 
@@ -127,15 +135,29 @@ export default function NuevoProductoDialog({
 
           <div className="grid grid-cols-2 gap-3">
             {PRODUCTO_SINGLE_EDIT_FIELDS.map((campo) => (
-              <div key={campo} className="flex flex-col gap-1.5">
-                <Label htmlFor={`nuevo-producto-${campo}`}>{PRODUCTO_FIELD_LABELS[campo]}</Label>
-                <Input
-                  id={`nuevo-producto-${campo}`}
-                  value={values[campo]}
-                  onChange={(e) => setValues((prev) => ({ ...prev, [campo]: e.target.value }))}
-                  inputMode={PRODUCTO_NUMERIC_FIELDS.has(campo) ? "decimal" : "text"}
-                />
-              </div>
+              <Fragment key={campo}>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={`nuevo-producto-${campo}`}>{PRODUCTO_FIELD_LABELS[campo]}</Label>
+                  <Input
+                    id={`nuevo-producto-${campo}`}
+                    value={values[campo]}
+                    onChange={(e) => handleFieldChange(campo, e.target.value)}
+                    inputMode={PRODUCTO_NUMERIC_FIELDS.has(campo) ? "decimal" : "text"}
+                  />
+                </div>
+                {campo === "precioSugerido" && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="nuevo-producto-pct-ganancia">% de ganancia</Label>
+                    <Input
+                      id="nuevo-producto-pct-ganancia"
+                      value={porcentajeGanancia}
+                      onChange={(e) => setPorcentajeGanancia(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="Solo para calcular el Precio Sugerido"
+                    />
+                  </div>
+                )}
+              </Fragment>
             ))}
           </div>
 

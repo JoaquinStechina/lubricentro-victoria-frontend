@@ -108,3 +108,29 @@ export const PRODUCTO_NUMERIC_FIELDS = new Set<string>([
   "precioSugerido",
   "alicuotaIva",
 ]);
+
+// Redondeo a 2 decimales: evita que el resultado arrastre el error de coma
+// flotante de JS (ej. 333.33 * 17.5 / 100 = 58.332750000000004) — mismo
+// criterio que ReviewTable.tsx usa al calcular estos mismos campos durante
+// la revisión de una carga.
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+// "Precio Neto C/IVA" / "Precio Lista C/IVA" a partir de un precio base
+// (neto o lista) + alícuota — misma fórmula en los dos casos, para que un
+// producto cargado a mano dé el mismo resultado que uno cargado por
+// archivo (ver ReviewTable.tsx). null si falta cualquiera de los dos datos
+// (no inventa un valor con solo la mitad de la cuenta).
+export function calcularPrecioConIva(precioBase: number, alicuotaIva: number): number | null {
+  if (!Number.isFinite(precioBase) || !Number.isFinite(alicuotaIva)) return null;
+  return round2(precioBase + (precioBase * alicuotaIva) / 100);
+}
+
+// Precio Sugerido = Precio Neto C/IVA + % de ganancia. El % de ganancia no
+// es un campo del producto (no se persiste): es un dato auxiliar que solo
+// existe mientras se completa el formulario, igual que en ReviewTable.tsx.
+export function calcularPrecioSugerido(precioConIva: number, porcentajeGanancia: number): number | null {
+  if (!Number.isFinite(precioConIva) || !Number.isFinite(porcentajeGanancia)) return null;
+  return round2(precioConIva + (precioConIva * porcentajeGanancia) / 100);
+}
