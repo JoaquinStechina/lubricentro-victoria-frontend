@@ -33,6 +33,7 @@ export type ProductoColumnKey =
   | "proveedor"
   | "marca"
   | "sku"
+  | "skuProveedor"
   | "descripcion"
   | "seccion"
   | "precioNetoMin"

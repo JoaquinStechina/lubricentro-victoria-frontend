@@ -47,6 +47,7 @@ const CATALOGO_COLUMN_OPTIONS: ColumnOption[] = [
   { key: "proveedor", label: "Proveedor" },
   { key: "marca", label: "Marca" },
   { key: "sku", label: "SKU interno" },
+  { key: "skuProveedor", label: "SKU proveedor" },
   { key: "descripcion", label: "Descripción" },
   { key: "seccion", label: "Sección" },
   { key: "precioNeto", label: "Precio neto" },
@@ -63,6 +64,7 @@ const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   proveedor: "",
   marca: "",
   sku: "",
+  skuProveedor: "",
   descripcion: "",
   seccion: "",
   precioNetoMin: "",
@@ -369,6 +371,22 @@ export default function CatalogoView() {
             text={producto.skuInterno ?? producto.skuProveedor ?? "—"}
             query={debouncedSearch}
           />
+        </TableCell>
+      ),
+    },
+    skuProveedor: {
+      header: () => (
+        <ColumnFilterHeader
+          label="SKU proveedor"
+          value={columnFilters.skuProveedor}
+          onChange={(v) => setColumnFilter("skuProveedor", v)}
+          sortDirection={sort?.campo === "skuProveedor" ? sort.order : null}
+          onSortToggle={() => toggleSort("skuProveedor")}
+        />
+      ),
+      cell: (producto) => (
+        <TableCell className="font-mono text-xs text-zinc-700 dark:text-zinc-300">
+          <HighlightText text={producto.skuProveedor ?? "—"} query={debouncedSearch} />
         </TableCell>
       ),
     },
