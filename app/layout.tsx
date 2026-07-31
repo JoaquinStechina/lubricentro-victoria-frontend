@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { getSession } from "@/app/lib/session";
 import { SessionProvider } from "@/app/components/SessionProvider";
+import { ThemeProvider } from "@/app/components/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,18 +34,19 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* shadcn's `dark` variant is class-based, not media-based; this
-            keeps dark mode following the OS preference like before, without
-            a manual toggle. */}
+        {/* Applies the stored theme (or the OS preference, if none is
+            stored) before hydration so there's no flash of the wrong theme. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark')}}catch(e){}",
+              "try{var t=localStorage.getItem('theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}",
           }}
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <SessionProvider session={session}>{children}</SessionProvider>
+        <ThemeProvider>
+          <SessionProvider session={session}>{children}</SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

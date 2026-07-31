@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOutIcon, UsersIcon } from "lucide-react";
 import { useSession } from "@/app/components/SessionProvider";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import { API_URL } from "@/app/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export default function UserMenu() {
 
   return (
     <div className="flex items-center gap-3">
+      <ThemeToggle />
       {session.rol === "SYSADMIN" && (
         <Link href="/usuarios">
           <Button variant="ghost" size="sm">
