@@ -128,18 +128,26 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
   // crudas — pero preserva cualquier celda que el usuario ya haya corregido
   // a mano (dirtyRef), en vez de pisarla con el nuevo valor derivado.
   // También recalcula, salvo que la celda puntual esté en dirtyRef:
-  // - precio_con_iva: si se mapeó la columna "IVA" (alicuota_iva), se
-  //   deriva de precio_neto + precio_neto * IVA/100 en vez de (o adicional
-  //   a) lo que haya venido de una columna mapeada directamente. Si falta
-  //   precio_neto o IVA en la fila, se deja el valor que ya tenía.
+  // - alicuota_iva: si la fila no tiene un valor propio (no se mapeó
+  //   columna de IVA, o la mapeada vino vacía) y el proveedor tiene una
+  //   alícuota por defecto configurada (Proveedor.alicuotaIvaDefault — ej.
+  //   BOR&UR nunca informa IVA en sus listas, siempre es 21%), se
+  //   autocompleta acá para que el revisor la vea de entrada. Mismo
+  //   criterio que aplicarAlicuotaIvaDefault en el backend
+  //   (backend/src/extraction/mapping.ts).
+  // - precio_con_iva: se deriva de precio_neto + precio_neto * IVA/100
+  //   usando el IVA de la fila (mapeado o recién autocompletado arriba) en
+  //   vez de lo que haya venido de una columna mapeada directamente a
+  //   precio_con_iva. Si falta precio_neto o IVA en la fila, se deja el
+  //   valor que ya tenía.
   // - precio_lista_con_iva: mismo criterio pero a partir de precio_lista;
-  //   nunca se mapea directamente, así que sin IVA mapeada queda vacío.
+  //   nunca se mapea directamente, así que sin IVA disponible queda vacío.
   // - precio_sugerido: precio_con_iva + precio_con_iva * % de ganancia/100
   //   (el % lo carga el usuario en esta misma pantalla), usando el
   //   precio_con_iva ya recalculado arriba si correspondía.
   useEffect(() => {
     const preview = applyMappingPreview(headers, rawRows, mapping);
-    const ivaMapeado = Object.values(mapping).some((destinos) => destinos.includes("alicuota_iva"));
+    const alicuotaIvaDefault = carga.proveedor?.alicuotaIvaDefault ?? null;
     // Number("") es 0 (no NaN): tratamos "sin valor" como NaN a propósito
     // para no calcular "0" cuando falta un dato.
     const toNum = (raw: string | undefined) => {
@@ -165,7 +173,15 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
           }
         }
 
-        if (ivaMapeado && !dirtyRef.current.has(`${idx}:precio_con_iva`)) {
+        if (
+          alicuotaIvaDefault != null &&
+          !dirtyRef.current.has(`${idx}:alicuota_iva`) &&
+          !Number.isFinite(toNum(merged.alicuota_iva))
+        ) {
+          merged.alicuota_iva = String(alicuotaIvaDefault);
+        }
+
+        if (!dirtyRef.current.has(`${idx}:precio_con_iva`)) {
           const precioNeto = toNum(merged.precio_neto);
           const iva = toNum(merged.alicuota_iva);
           if (Number.isFinite(precioNeto) && Number.isFinite(iva)) {
@@ -175,15 +191,13 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
 
         if (dirtyRef.current.has(`${idx}:precio_lista_con_iva`)) {
           merged.precio_lista_con_iva = prevRow?.precio_lista_con_iva;
-        } else if (ivaMapeado) {
+        } else {
           const precioLista = toNum(merged.precio_lista);
           const iva = toNum(merged.alicuota_iva);
           merged.precio_lista_con_iva =
             Number.isFinite(precioLista) && Number.isFinite(iva)
               ? String(round2(precioLista + (precioLista * iva) / 100))
               : "";
-        } else {
-          merged.precio_lista_con_iva = "";
         }
 
         if (dirtyRef.current.has(`${idx}:precio_sugerido`)) {
@@ -358,8 +372,10 @@ export default function ReviewTable({ carga, onConfirmed }: ReviewTableProps) {
         </div>
         <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
           Si mapeás una columna a &quot;IVA %&quot;, Precio Neto C/IVA y Precio Lista C/IVA se
-          calculan solos (precio + precio × IVA / 100) a partir de Precio neto y Precio Lista. Se
-          puede corregir a mano fila por fila.
+          calculan solos (precio + precio × IVA / 100) a partir de Precio neto y Precio Lista.
+          {carga.proveedor?.alicuotaIvaDefault != null &&
+            ` Este proveedor no informa IVA por columna: se completa ${carga.proveedor.alicuotaIvaDefault}% por defecto en las filas sin valor propio.`}{" "}
+          Se puede corregir a mano fila por fila.
         </p>
       </section>
 

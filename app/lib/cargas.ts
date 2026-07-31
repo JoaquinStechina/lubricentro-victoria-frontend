@@ -128,6 +128,11 @@ export type Advertencia = {
 export type Proveedor = {
   id: number;
   nombre: string;
+  // Alícuota de IVA a inferir cuando una fila no trae columna de IVA propia
+  // (ej. BOR&UR nunca informa IVA en sus listas — ver
+  // backend/src/extraction/mapping.ts, aplicarAlicuotaIvaDefault). null =
+  // sin default configurado, no inventar nada.
+  alicuotaIvaDefault: number | null;
 };
 
 export type CargaEstado =

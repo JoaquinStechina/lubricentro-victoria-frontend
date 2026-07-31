@@ -11,11 +11,6 @@ import type { CanonicalField, CanonicalRowInput, ColumnMapping, ExtractedRow } f
 // previsualización con algún valor mal formateado, nunca un dato mal
 // guardado — el backend vuelve a parsear todo desde cero.
 // Mantener sincronizado con backend/src/extraction/mapping.ts.
-function toDisplayString(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  return String(value).trim();
-}
-
 // Columnas que representan un código: al combinar varias columnas de origen
 // en este destino, se unen sin separador (reconstruye un código partido en
 // dos columnas). El resto de los campos sigue uniéndose con espacio.
@@ -35,6 +30,22 @@ const CAMPOS_NUMERICOS = new Set<CanonicalField>([
   "alicuota_iva",
 ]);
 
+function toDisplayString(value: unknown, destino?: CanonicalField): string {
+  if (value === null || value === undefined) return "";
+  // Celdas numéricas de xlsx (raw: true, ver backend/src/extraction/excel.ts)
+  // pueden traer arrastre de punto flotante (ej. 1234.5600000000001) que
+  // String() muestra tal cual — se ve "de terror" en la tabla de revisión
+  // aunque el dato final que guarda el backend ya sale redondeado
+  // (normalizeCanonicalRow usa roundTo2). Acá es solo cosmético: redondear
+  // antes de mostrar para campos de precio/IVA cuando el valor crudo es un
+  // number real (si ya viene como texto con formato, ej. "$ 1.985,78", se
+  // deja igual — el parseo tolerante de ese formato lo hace el backend).
+  if (typeof value === "number" && destino && CAMPOS_NUMERICOS.has(destino)) {
+    return Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "";
+  }
+  return String(value).trim();
+}
+
 export function applyMappingPreview(
   headers: string[],
   rows: ExtractedRow[],
@@ -50,7 +61,7 @@ export function applyMappingPreview(
       if (destinos && destinos.length > 0) {
         for (const destino of destinos) {
           const lista = valoresPorDestino.get(destino) ?? [];
-          lista.push(toDisplayString(valor));
+          lista.push(toDisplayString(valor, destino));
           valoresPorDestino.set(destino, lista);
         }
       } else if (valor !== null && valor !== undefined && valor !== "") {
