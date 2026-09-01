@@ -6,7 +6,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { apiFetch } from "@/app/lib/api";
 import { ESTADO_LABELS, TIPO_DATOS_LABELS, type Carga, type CargaEstado } from "@/app/lib/cargas";
 import UploadForm from "@/app/components/cargas/UploadForm";
-import UserMenu from "@/app/components/UserMenu";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -73,7 +73,7 @@ export default function CargasPage() {
               >
                 Auto-descargas
               </Link>
-              <UserMenu />
+              <ThemeToggle />
             </div>
           </div>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">

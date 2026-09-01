@@ -54,7 +54,6 @@ export default function UploadForm({ onUploaded }: UploadFormProps) {
       const res = await fetch(`${API_URL}/api/uploads`, {
         method: "POST",
         body: formData,
-        credentials: "include",
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);

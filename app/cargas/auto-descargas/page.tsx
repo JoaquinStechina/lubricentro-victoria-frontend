@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
-import UserMenu from "@/app/components/UserMenu";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import AutoDescargasView from "@/app/components/autoDescargas/AutoDescargasView";
 
 export default function AutoDescargasPage() {
@@ -18,7 +18,7 @@ export default function AutoDescargasPage() {
               <ArrowLeftIcon className="size-3.5" />
               Cargas
             </Link>
-            <UserMenu />
+            <ThemeToggle />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             Auto-descargas por marca

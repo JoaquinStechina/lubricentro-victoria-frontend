@@ -15,7 +15,6 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyb
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
 import { useColumnPrefs } from "@/app/lib/useColumnPrefs";
-import { useSession } from "@/app/components/SessionProvider";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/ColumnVisibilityMenu";
 import ExportarButton from "@/app/components/ExportarButton";
@@ -132,9 +131,6 @@ function formatPorcentaje(valor: number | null) {
 }
 
 export default function CatalogoView() {
-  const session = useSession();
-  const puedeEditar = session?.rol === "ADMINISTRADOR" || session?.rol === "SYSADMIN";
-
   const [search, setSearch] = useState("");
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [page, setPage] = useState(1);
@@ -743,7 +739,7 @@ export default function CatalogoView() {
     .filter((key) => !hiddenColumns.has(key))
     .map((key) => ({ key, def: columnDefsByKey[key] }));
 
-  const colSpan = (puedeEditar ? 1 : 0) + 1 + visibleColumnDefs.length + 1;
+  const colSpan = 1 + 1 + visibleColumnDefs.length + 1;
 
   return (
     <>
@@ -780,21 +776,17 @@ export default function CatalogoView() {
             getParams={buildExportParams}
             nombreArchivo="catalogo"
           />
-          {puedeEditar && (
-            <Button onClick={() => setNuevoOpen(true)}>
-              <Plus className="size-3.5" />
-              Nuevo producto
-            </Button>
-          )}
+          <Button onClick={() => setNuevoOpen(true)}>
+            <Plus className="size-3.5" />
+            Nuevo producto
+          </Button>
         </div>
-        {puedeEditar && (
-          <div className="flex items-center gap-5 text-sm">
-            <label className="flex cursor-pointer items-center gap-2">
-              <Switch checked={verEliminados} onCheckedChange={setVerEliminados} />
-              <span className="text-zinc-700 dark:text-zinc-300">Ver eliminados (papelera)</span>
-            </label>
-          </div>
-        )}
+        <div className="flex items-center gap-5 text-sm">
+          <label className="flex cursor-pointer items-center gap-2">
+            <Switch checked={verEliminados} onCheckedChange={setVerEliminados} />
+            <span className="text-zinc-700 dark:text-zinc-300">Ver eliminados (papelera)</span>
+          </label>
+        </div>
       </section>
 
       <TablePaginationBar
@@ -807,7 +799,7 @@ export default function CatalogoView() {
         className="mb-2"
       />
 
-      {puedeEditar && selectedIds.size > 0 && (
+      {selectedIds.size > 0 && (
         <div className="mb-2 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
             {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
@@ -834,16 +826,14 @@ export default function CatalogoView() {
         <Table className="table-fixed">
           <TableHeader>
             <TableRow className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              {puedeEditar && (
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onCheckedChange={toggleAll}
-                    aria-label="Seleccionar todo"
-                  />
-                </TableHead>
-              )}
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onCheckedChange={toggleAll}
+                  aria-label="Seleccionar todo"
+                />
+              </TableHead>
               <TableHead aria-label="Imagen" className="w-14" />
               <DndContext
                 sensors={columnDragSensors}
@@ -888,15 +878,13 @@ export default function CatalogoView() {
                       (producto.eliminado ? "opacity-60" : "")
                     }
                   >
-                    {puedeEditar && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(producto.id)}
-                          onCheckedChange={() => toggleRow(producto.id)}
-                          aria-label="Seleccionar fila"
-                        />
-                      </TableCell>
-                    )}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(producto.id)}
+                        onCheckedChange={() => toggleRow(producto.id)}
+                        aria-label="Seleccionar fila"
+                      />
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       {producto.imagenUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element

@@ -8,42 +8,12 @@ Aplicación web para visualizar y filtrar el catálogo centralizado de listas de
 
 Al tipear en el buscador se filtran **todas** las columnas de la tabla (no solo SKU/Descripción), la comparación **ignora acentos** (`bateria` encuentra tanto `BATERIA` como `BATERÍA`) y las coincidencias se resaltan en toda la fila.
 
-## Autenticación y roles
+## Acceso
 
-Toda la app requiere sesión iniciada — incluida la vista pública `/`. Hay
-tres roles con jerarquía acumulativa:
-
-- **Empleado**: solo ve `/` (catálogo y ofertas).
-- **Administrador**: además, `/cargas`, `/cargas/:id` y `/cargas/gestion`
-  (cargar y gestionar datos).
-- **Sysadmin**: además, `/usuarios` (crear/editar cuentas de administrador y
-  empleado).
-
-`proxy.ts` (raíz del proyecto — en Next.js 16 reemplaza a `middleware.ts`,
-deprecado) verifica en cada request la cookie de sesión (`session`, JWT
-httpOnly emitido por el backend en `POST /api/auth/login`) y redirige a
-`/login` si falta, o a `/` si el rol no alcanza para la ruta pedida. Es un
-chequeo optimista (solo lee el JWT, sin ir a la base) — la autorización real
-para cada acción la vuelve a validar el backend (ver
-`../backend/README.md`, sección "Autenticación y roles"); no hay que
-confiar solo en este gate del lado del cliente.
-
-`app/lib/session.ts` (`getSession()`) hace la misma verificación del lado
-del servidor para Server Components y Route Handlers — usado en
-`app/layout.tsx` (que arma el `SessionProvider`/`useSession()` consumido
-por `UserMenu` y por las páginas para mostrar/ocultar acciones según rol,
-incluyendo la columna de selección y la barra Editar/Eliminar de
-Catálogo/Ofertas, visibles solo para `ADMINISTRADOR`+).
-
-El gate de rol del lado del cliente (ocultar botones) es solo UX: la
-autorización real la vuelve a validar el backend en cada endpoint que
-muta datos (`requireRole`, ver `../backend/README.md`) — por ejemplo, un
-`EMPLEADO` que llame `PATCH /api/productos/:id` directo recibe 403 aunque
-la UI nunca le muestre el botón.
-
-Requiere `JWT_SECRET` en `.env.local` — **mismo valor** que
-`JWT_SECRET` en `backend/.env`, porque ambos firman/verifican el mismo
-token.
+La app no tiene login: cualquiera que la abra entra directo al catálogo con
+acceso completo (cargar archivos, editar, eliminar). El backend tampoco
+autentica — si hace falta restringir el acceso, va a nivel de red (allowlist
+de IPs, VPN o basic auth en el reverse proxy), ver `../infra/README.md`.
 
 ## Funcionalidades
 
@@ -52,8 +22,8 @@ token.
 - **Ordenar por columna** (ambas pestañas): click en el nombre de la columna cicla ascendente → descendente → orden por defecto (última carga primero). El orden lo aplica el backend (`?sort=&order=`, whitelist por tabla — ver `../backend/README.md`).
 - **Filas por página**: selector 50/100/200 junto al contador de resultados, en ambas pestañas.
 - **Exportar** (ambas pestañas): botón junto al buscador con menú Excel (.xlsx) / CSV (.csv). Baja el **resultado filtrado completo** (mismos filtros y orden que la tabla, sin paginar) desde `GET /api/productos|ofertas/export` (`ExportarButton.tsx` + `apiDownload` en `lib/api.ts`). El CSV viene preparado para Excel es-AR (separador `;`, decimales con coma, BOM UTF-8).
-- **Estado y cierre de ofertas** (pestaña "Ofertas"): columna "Estado" con badge Activa / Cerrada (cierre manual) / Vencida (`fechaHasta` pasada, calculada con fecha local, no UTC). Switch "Ver cerradas/vencidas" (`?incluirCerradas=true`). Con filas seleccionadas (`ADMINISTRADOR`+) aparecen "Marcar agotada" / "Reactivar" según lo que haya en la selección — usan los `POST /api/ofertas/cerrar|reactivar` existentes, que operan por (proveedor, n° oferta, SKU): **cierran todos los tramos de cantidad de ese SKU**, incluso los no seleccionados (avisado en la UI).
-- **Papelera** (ambas pestañas, solo `ADMINISTRADOR`+): switch "Ver eliminados" que cambia la tabla a **solo** las filas borradas (badge "Eliminado" + fila atenuada). En ese modo la barra de selección ofrece únicamente **Restaurar** (`POST /api/productos|ofertas/restaurar`); Editar/Eliminar quedan ocultos. El backend ignora el flag para `EMPLEADO`.
+- **Estado y cierre de ofertas** (pestaña "Ofertas"): columna "Estado" con badge Activa / Cerrada (cierre manual) / Vencida (`fechaHasta` pasada, calculada con fecha local, no UTC). Switch "Ver cerradas/vencidas" (`?incluirCerradas=true`). Con filas seleccionadas aparecen "Marcar agotada" / "Reactivar" según lo que haya en la selección — usan los `POST /api/ofertas/cerrar|reactivar` existentes, que operan por (proveedor, n° oferta, SKU): **cierran todos los tramos de cantidad de ese SKU**, incluso los no seleccionados (avisado en la UI).
+- **Papelera** (ambas pestañas): switch "Ver eliminados" que cambia la tabla a **solo** las filas borradas (badge "Eliminado" + fila atenuada). En ese modo la barra de selección ofrece únicamente **Restaurar** (`POST /api/productos|ofertas/restaurar`); Editar/Eliminar quedan ocultos.
 - **Historial de precios** (ambas pestañas, cualquier rol): botón ⟳ al final de cada fila que abre un modal con la evolución del precio de ese SKU (catálogo: por proveedor+marca+SKU; ofertas: por tramo proveedor+SKU+desde cantidad) — gráfico de línea SVG propio (`HistorialChart.tsx`, sin librería de charts) más la tabla completa con fecha de carga, precios, archivo de origen y estado (`HistorialProductoDialog.tsx` / `HistorialOfertaDialog.tsx`, `GET /api/productos|ofertas/:id/historial`).
 - Todos los modos de filtro (texto, select, combobox, rango, fecha) conviven en `ColumnFilterHeader.tsx` vía props opcionales (`options`, `searchOptions`, `rangeValue`/`onRangeChange`, `dateValue`/`onDateChange`, `sortDirection`/`onSortToggle`). El ícono de filtro (embudo) siempre queda a la derecha del de orden en todas las columnas, incluidas las alineadas a la derecha (precios, cantidades) — el contenedor usa `justify-end` para empujar el grupo al borde de la celda sin invertir el orden de los ítems (antes usaba `flex-row-reverse`, que además de posicionar invertía el orden visual).
 - Todos los filtros son **combinables** entre sí con lógica AND (cada uno reduce más el resultado sobre el anterior), incluyendo el buscador de texto libre.
@@ -61,7 +31,7 @@ token.
 - Las coincidencias se **resaltan** en cualquier columna donde aparezcan.
 - Filas con datos del proveedor que no entran en el schema canónico se pueden expandir para ver el `raw_data` original.
 - Tema claro/oscuro automático según preferencia del sistema operativo.
-- **Editar y eliminar filas** (`/`, ambas pestañas, solo `ADMINISTRADOR`+): cada fila tiene un
+- **Editar y eliminar filas** (`/`, ambas pestañas): cada fila tiene un
   checkbox de selección, más uno en el header para seleccionar todas las filas de la página
   actual (no todo el resultado filtrado). Con filas seleccionadas aparece una barra con:
   - **Editar**: con 1 fila seleccionada abre un formulario con todos sus campos editables
@@ -76,7 +46,7 @@ token.
 
   Ver `../backend/README.md` para las listas blancas de campos editables y el detalle de cada
   endpoint.
-- **Crear producto/oferta a mano** (`/`, ambas pestañas, solo `ADMINISTRADOR`+): botón "Nuevo
+- **Crear producto/oferta a mano** (`/`, ambas pestañas): botón "Nuevo
   producto"/"Nueva oferta" junto al buscador, en paralelo al pipeline de carga masiva por archivo
   — para dar de alta una fila suelta sin pasar por `/cargas`
   (`NuevoProductoDialog.tsx`/`NuevaOfertaDialog.tsx`, `POST /api/productos|ofertas`). El campo
@@ -87,7 +57,7 @@ token.
   propio input (`required`) antes de tocar el backend.
 - **Imagen por fila** (`/`, ambas pestañas): miniatura como primera columna de la tabla
   (placeholder gris si no tiene foto). Se sube/reemplaza/quita desde el diálogo de alta o de
-  edición (`ADMINISTRADOR`+, `POST`/`DELETE /api/productos|ofertas/:id/imagen`, JPG/PNG/WEBP hasta
+  edición (`POST`/`DELETE /api/productos|ofertas/:id/imagen`, JPG/PNG/WEBP hasta
   5MB) — la subida es una acción aparte del resto del formulario, se dispara apenas se elige el
   archivo y no espera al botón "Guardar". `imagenSrc()` (`app/lib/api.ts`) arma la URL completa a
   partir de la ruta relativa que devuelve el backend.
@@ -111,7 +81,7 @@ token.
     en dos columnas). Mismo criterio en los dos lados: `applyMappingPreview.ts` /
     `applyMappingPreviewOfertas.ts` en el frontend (vista previa instantánea, antes de confirmar),
     `applyMapping`/`applyMappingOfertas` en `../backend` (ver su README, sección "Extracción").
-- **Auto-descargas** (`/cargas/auto-descargas`, `ADMINISTRADOR`+, `AutoDescargasView.tsx`): CRUD de
+- **Auto-descargas** (`/cargas/auto-descargas`, `AutoDescargasView.tsx`): CRUD de
   las marcas que se descargan solas a diario (`GET`/`POST`/`PATCH`/`DELETE /api/auto-descargas` —
   ver `../backend/README.md`, sección "Automatización") — proveedor, marca, % de ganancia default
   y un switch para activar/desactivar sin borrar la fila. "Probar ahora" corre esa fila al toque
@@ -150,11 +120,10 @@ npm install
 npm run dev
 ```
 
-Necesita `.env.local` con `NEXT_PUBLIC_API_URL` y `JWT_SECRET` (ver
-"Autenticación y roles"), y el backend corriendo con al menos un `SYSADMIN`
-sembrado (`npm run seed:sysadmin` en `../backend`, ver su README).
+Necesita `.env.local` con `NEXT_PUBLIC_API_URL` y el backend corriendo
+(ver su README).
 
-Abrí [http://localhost:3000](http://localhost:3000) — redirige a `/login`.
+Abrí [http://localhost:3000](http://localhost:3000).
 
 ## Despliegue
 
@@ -164,8 +133,7 @@ dominio, acceso por IP pública) — arquitectura completa en `../infra/README.m
 
 `NEXT_PUBLIC_API_URL` se hornea en el bundle en build time, no en runtime: en el
 `docker-compose.yml` de `infra/` entra como build-arg, no como variable de entorno del
-contenedor. `JWT_SECRET`, en cambio, se lee en runtime (`proxy.ts` / `app/lib/session.ts`,
-server-side) y sí va en el `.env` del contenedor.
+contenedor. Es la única variable que necesita el frontend, así que no lleva `.env` propio.
 
 ## Datos
 

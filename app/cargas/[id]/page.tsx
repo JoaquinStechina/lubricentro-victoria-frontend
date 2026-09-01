@@ -8,7 +8,7 @@ import { apiFetch } from "@/app/lib/api";
 import type { Carga } from "@/app/lib/cargas";
 import ReviewTable from "@/app/components/cargas/ReviewTable";
 import ReviewTableOfertas from "@/app/components/cargas/ReviewTableOfertas";
-import UserMenu from "@/app/components/UserMenu";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 
 const LOADER_STAGES = [
@@ -161,7 +161,7 @@ function Wrapper({ carga, children }: { carga?: Carga; children: React.ReactNode
             >
               ← Cargas
             </Link>
-            <UserMenu />
+            <ThemeToggle />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             {carga?.nombreArchivo ?? "Cargando…"}

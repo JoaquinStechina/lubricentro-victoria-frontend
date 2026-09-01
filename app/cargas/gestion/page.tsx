@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeftIcon } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
-import UserMenu from "@/app/components/UserMenu";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,7 +58,7 @@ export default function GestionPage() {
               <ArrowLeftIcon className="size-3.5" />
               Cargas
             </Link>
-            <UserMenu />
+            <ThemeToggle />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             Catálogo y ofertas
