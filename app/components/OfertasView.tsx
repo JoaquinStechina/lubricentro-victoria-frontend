@@ -15,6 +15,7 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyb
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Oferta, OfertaColumnKey } from "@/app/lib/ofertas";
 import { useColumnPrefs } from "@/app/lib/useColumnPrefs";
+import { useTablaRecurso } from "@/app/lib/useTablaRecurso";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/ColumnVisibilityMenu";
 import ExportarButton from "@/app/components/ExportarButton";
@@ -102,8 +103,6 @@ const EMPTY_COLUMN_FILTERS: Record<OfertaColumnKey, string> = {
   cantidadDisponibleMax: "",
 };
 
-type SortState = { campo: string; order: "asc" | "desc" } | null;
-
 // "sin_fecha"/"con_fecha" en vez de comparar contra un valor de texto: null
 // en fechaHasta no se puede buscar con un filtro "contains" (ver
 // backend/src/routes/ofertas.ts f_vigencia).
@@ -151,20 +150,15 @@ function estadoOferta(oferta: Oferta, hoy: string): {
 // Paginación server-side, mismo patrón que CatalogoView.tsx (antes traía
 // todo el resultado filtrado y paginaba en memoria).
 export default function OfertasView() {
-
-  const [search, setSearch] = useState("");
-  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
-  const [sort, setSort] = useState<SortState>(null);
+  const tabla = useTablaRecurso({
+    filtrosIniciales: EMPTY_COLUMN_FILTERS,
+    pageSizeInicial: PAGE_SIZES[0],
+  });
   const [incluirCerradas, setIncluirCerradas] = useState(false);
-  const [verEliminadas, setVerEliminadas] = useState(false);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
-  const [reloadTick, setReloadTick] = useState(0);
 
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
@@ -194,54 +188,23 @@ export default function OfertasView() {
     setColumnOrder(arrayMove(columnOrder, oldIndex, newIndex));
   }
 
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [debouncedColumnFilters, setDebouncedColumnFilters] = useState(
-    EMPTY_COLUMN_FILTERS
-  );
-  useEffect(() => {
-    const id = setTimeout(() => {
-      setDebouncedSearch(search);
-      setDebouncedColumnFilters(columnFilters);
-    }, 300);
-    return () => clearTimeout(id);
-  }, [search, columnFilters]);
+  // Para el resaltado se usa el término ya confirmado por el debounce, no el
+  // crudo (ver comentario en useTablaRecurso).
+  const debouncedSearch = tabla.debouncedSearch;
 
-  function setColumnFilter(key: OfertaColumnKey, value: string) {
-    setColumnFilters((prev) => ({ ...prev, [key]: value }));
-  }
-
-  // El ciclo de orden por columna es asc → desc → sin orden; ordenar por
-  // otra columna arranca de nuevo en asc.
-  function toggleSort(campo: string) {
-    setSort((prev) => {
-      if (!prev || prev.campo !== campo) return { campo, order: "asc" };
-      if (prev.order === "asc") return { campo, order: "desc" };
-      return null;
-    });
-  }
-
-  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}|${incluirCerradas}|${verEliminadas}`;
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
-  if (filterKey !== prevFilterKey) {
-    setPrevFilterKey(filterKey);
-    setPage(1);
+  // incluirCerradas es un filtro propio de Ofertas y no vive en
+  // useTablaRecurso (ver comentario ahí), pero tiene que resetear la página
+  // igual que los demás filtros.
+  const [prevIncluirCerradas, setPrevIncluirCerradas] = useState(incluirCerradas);
+  if (incluirCerradas !== prevIncluirCerradas) {
+    setPrevIncluirCerradas(incluirCerradas);
+    tabla.setPage(1);
   }
 
   useEffect(() => {
     let active = true;
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    for (const [key, value] of Object.entries(debouncedColumnFilters)) {
-      if (value) params.set(`f_${key}`, value);
-    }
-    if (sort) {
-      params.set("sort", sort.campo);
-      params.set("order", sort.order);
-    }
+    const params = tabla.buildParams(true);
     if (incluirCerradas) params.set("incluirCerradas", "true");
-    if (verEliminadas) params.set("incluirEliminados", "true");
-    params.set("page", String(page));
-    params.set("pageSize", String(pageSize));
 
     async function load() {
       setLoading(true);
@@ -250,7 +213,7 @@ export default function OfertasView() {
         if (active) {
           setData(json);
           setExpandedRow(null);
-          setSelectedIds(new Set());
+          tabla.clearSelection();
         }
       } finally {
         if (active) setLoading(false);
@@ -261,32 +224,16 @@ export default function OfertasView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, sort, incluirCerradas, verEliminadas, page, pageSize, reloadTick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabla.fetchKey, incluirCerradas]);
 
-  const hayFiltrosActivos =
-    search || Object.values(columnFilters).some((v) => v);
-
-  function limpiarFiltros() {
-    setSearch("");
-    setColumnFilters(EMPTY_COLUMN_FILTERS);
-  }
-
-  // Mismos filtros/orden que la tabla (el GET de ofertas no pagina en el
-  // backend, así que no hay page/pageSize que excluir).
-  function buildExportParams() {
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    for (const [key, value] of Object.entries(debouncedColumnFilters)) {
-      if (value) params.set(`f_${key}`, value);
-    }
-    if (sort) {
-      params.set("sort", sort.campo);
-      params.set("order", sort.order);
-    }
-    if (incluirCerradas) params.set("incluirCerradas", "true");
-    if (verEliminadas) params.set("incluirEliminados", "true");
-    return params;
-  }
+  // Mismos filtros/orden que la tabla, sin page/pageSize: el export baja el
+  // resultado completo (ver GET /api/ofertas/export).
+  const buildExportParams = () => {
+    const p = tabla.buildParams(false);
+    if (incluirCerradas) p.set("incluirCerradas", "true");
+    return p;
+  };
 
   const pageItems = data?.items ?? [];
 
@@ -298,29 +245,17 @@ export default function OfertasView() {
   }, [data]);
 
   const visibleIds = pageItems.map((o) => o.id);
-  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
-  const someSelected = !allSelected && visibleIds.some((id) => selectedIds.has(id));
-
-  function toggleAll() {
-    setSelectedIds(allSelected ? new Set() : new Set(visibleIds));
-  }
-  function toggleRow(id: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => tabla.selectedIds.has(id));
+  const someSelected = !allSelected && visibleIds.some((id) => tabla.selectedIds.has(id));
 
   const selectedOferta =
-    selectedIds.size === 1 ? (data?.items.find((o) => selectedIds.has(o.id)) ?? null) : null;
+    tabla.selectedIds.size === 1 ? (data?.items.find((o) => tabla.selectedIds.has(o.id)) ?? null) : null;
 
   function handleSingleUpdated(actualizada: Oferta) {
     setData((prev) =>
       prev ? { ...prev, items: prev.items.map((o) => (o.id === actualizada.id ? actualizada : o)) } : prev
     );
-    setSelectedIds(new Set());
+    tabla.clearSelection();
   }
   // A diferencia de handleSingleUpdated, no toca selectedIds — ver el mismo
   // criterio documentado en CatalogoView.tsx.
@@ -330,8 +265,8 @@ export default function OfertasView() {
     );
   }
   function handleBulkUpdated() {
-    setSelectedIds(new Set());
-    setReloadTick((t) => t + 1);
+    tabla.clearSelection();
+    tabla.recargar();
   }
   function handleDeleted(ids: number[]) {
     const eliminadas = new Set(ids);
@@ -344,14 +279,14 @@ export default function OfertasView() {
           }
         : prev
     );
-    setSelectedIds(new Set());
+    tabla.clearSelection();
   }
   function handleCreated() {
-    setPage(1);
-    setReloadTick((t) => t + 1);
+    tabla.setPage(1);
+    tabla.recargar();
   }
 
-  const seleccionadas = data?.items.filter((o) => selectedIds.has(o.id)) ?? [];
+  const seleccionadas = data?.items.filter((o) => tabla.selectedIds.has(o.id)) ?? [];
   const paraCerrar = seleccionadas.filter((o) => o.activa);
   const paraReactivar = seleccionadas.filter((o) => !o.activa);
   const [cambiandoEstado, setCambiandoEstado] = useState(false);
@@ -375,8 +310,8 @@ export default function OfertasView() {
       for (const body of porSku.values()) {
         await apiFetch(`/api/ofertas/${accion}`, apiJsonInit(body));
       }
-      setSelectedIds(new Set());
-      setReloadTick((t) => t + 1);
+      tabla.clearSelection();
+      tabla.recargar();
     } finally {
       setCambiandoEstado(false);
     }
@@ -385,9 +320,9 @@ export default function OfertasView() {
   async function restaurarSeleccion() {
     setCambiandoEstado(true);
     try {
-      await apiFetch(`/api/ofertas/restaurar`, apiJsonInit({ ids: [...selectedIds] }));
-      setSelectedIds(new Set());
-      setReloadTick((t) => t + 1);
+      await apiFetch(`/api/ofertas/restaurar`, apiJsonInit({ ids: [...tabla.selectedIds] }));
+      tabla.clearSelection();
+      tabla.recargar();
     } finally {
       setCambiandoEstado(false);
     }
@@ -409,10 +344,10 @@ export default function OfertasView() {
         >
           <ColumnFilterHeader
             label="Marca"
-            value={columnFilters.marca}
-            onChange={(v) => setColumnFilter("marca", v)}
-            sortDirection={sort?.campo === "marca" ? sort.order : null}
-            onSortToggle={() => toggleSort("marca")}
+            value={tabla.columnFilters.marca}
+            onChange={(v) => tabla.setColumnFilter("marca", v)}
+            sortDirection={tabla.sort?.campo === "marca" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("marca")}
           />
         </SortableResizableHead>
       ),
@@ -432,10 +367,10 @@ export default function OfertasView() {
         >
           <ColumnFilterHeader
             label="N° oferta"
-            value={columnFilters.numeroOferta}
-            onChange={(v) => setColumnFilter("numeroOferta", v)}
-            sortDirection={sort?.campo === "numeroOferta" ? sort.order : null}
-            onSortToggle={() => toggleSort("numeroOferta")}
+            value={tabla.columnFilters.numeroOferta}
+            onChange={(v) => tabla.setColumnFilter("numeroOferta", v)}
+            sortDirection={tabla.sort?.campo === "numeroOferta" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("numeroOferta")}
           />
         </SortableResizableHead>
       ),
@@ -455,10 +390,10 @@ export default function OfertasView() {
         >
           <ColumnFilterHeader
             label="SKU proveedor"
-            value={columnFilters.sku}
-            onChange={(v) => setColumnFilter("sku", v)}
-            sortDirection={sort?.campo === "sku" ? sort.order : null}
-            onSortToggle={() => toggleSort("sku")}
+            value={tabla.columnFilters.sku}
+            onChange={(v) => tabla.setColumnFilter("sku", v)}
+            sortDirection={tabla.sort?.campo === "sku" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("sku")}
           />
         </SortableResizableHead>
       ),
@@ -478,10 +413,10 @@ export default function OfertasView() {
         >
           <ColumnFilterHeader
             label="Descripción"
-            value={columnFilters.descripcion}
-            onChange={(v) => setColumnFilter("descripcion", v)}
-            sortDirection={sort?.campo === "descripcion" ? sort.order : null}
-            onSortToggle={() => toggleSort("descripcion")}
+            value={tabla.columnFilters.descripcion}
+            onChange={(v) => tabla.setColumnFilter("descripcion", v)}
+            sortDirection={tabla.sort?.campo === "descripcion" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("descripcion")}
           />
         </SortableResizableHead>
       ),
@@ -502,11 +437,11 @@ export default function OfertasView() {
         >
           <ColumnFilterHeader
             label="Desde cant."
-            value={columnFilters.desdeCantidad}
-            onChange={(v) => setColumnFilter("desdeCantidad", v)}
+            value={tabla.columnFilters.desdeCantidad}
+            onChange={(v) => tabla.setColumnFilter("desdeCantidad", v)}
             align="right"
-            sortDirection={sort?.campo === "desdeCantidad" ? sort.order : null}
-            onSortToggle={() => toggleSort("desdeCantidad")}
+            sortDirection={tabla.sort?.campo === "desdeCantidad" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("desdeCantidad")}
           />
         </SortableResizableHead>
       ),
@@ -529,13 +464,14 @@ export default function OfertasView() {
             label="Descuento"
             value=""
             onChange={() => {}}
-            rangeValue={{ min: columnFilters.descuentoPctMin, max: columnFilters.descuentoPctMax }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({ ...prev, descuentoPctMin: min, descuentoPctMax: max }))
-            }
+            rangeValue={{ min: tabla.columnFilters.descuentoPctMin, max: tabla.columnFilters.descuentoPctMax }}
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("descuentoPctMin", min);
+              tabla.setColumnFilter("descuentoPctMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "descuentoPct" ? sort.order : null}
-            onSortToggle={() => toggleSort("descuentoPct")}
+            sortDirection={tabla.sort?.campo === "descuentoPct" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("descuentoPct")}
           />
         </SortableResizableHead>
       ),
@@ -559,19 +495,16 @@ export default function OfertasView() {
             value=""
             onChange={() => {}}
             rangeValue={{
-              min: columnFilters.precioUnitarioMin,
-              max: columnFilters.precioUnitarioMax,
+              min: tabla.columnFilters.precioUnitarioMin,
+              max: tabla.columnFilters.precioUnitarioMax,
             }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({
-                ...prev,
-                precioUnitarioMin: min,
-                precioUnitarioMax: max,
-              }))
-            }
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("precioUnitarioMin", min);
+              tabla.setColumnFilter("precioUnitarioMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "precioUnitario" ? sort.order : null}
-            onSortToggle={() => toggleSort("precioUnitario")}
+            sortDirection={tabla.sort?.campo === "precioUnitario" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("precioUnitario")}
           />
         </SortableResizableHead>
       ),
@@ -595,19 +528,16 @@ export default function OfertasView() {
             value=""
             onChange={() => {}}
             rangeValue={{
-              min: columnFilters.cantidadDisponibleMin,
-              max: columnFilters.cantidadDisponibleMax,
+              min: tabla.columnFilters.cantidadDisponibleMin,
+              max: tabla.columnFilters.cantidadDisponibleMax,
             }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({
-                ...prev,
-                cantidadDisponibleMin: min,
-                cantidadDisponibleMax: max,
-              }))
-            }
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("cantidadDisponibleMin", min);
+              tabla.setColumnFilter("cantidadDisponibleMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "cantidadDisponible" ? sort.order : null}
-            onSortToggle={() => toggleSort("cantidadDisponible")}
+            sortDirection={tabla.sort?.campo === "cantidadDisponible" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("cantidadDisponible")}
           />
         </SortableResizableHead>
       ),
@@ -627,10 +557,10 @@ export default function OfertasView() {
         >
           <ColumnFilterHeader
             label="Vigencia"
-            value={columnFilters.fechaOferta}
-            onChange={(v) => setColumnFilter("fechaOferta", v)}
-            sortDirection={sort?.campo === "fechaOferta" ? sort.order : null}
-            onSortToggle={() => toggleSort("fechaOferta")}
+            value={tabla.columnFilters.fechaOferta}
+            onChange={(v) => tabla.setColumnFilter("fechaOferta", v)}
+            sortDirection={tabla.sort?.campo === "fechaOferta" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("fechaOferta")}
           />
         </SortableResizableHead>
       ),
@@ -650,13 +580,13 @@ export default function OfertasView() {
         >
           <ColumnFilterHeader
             label="Válida hasta"
-            value={columnFilters.vigencia}
-            onChange={(v) => setColumnFilter("vigencia", v)}
+            value={tabla.columnFilters.vigencia}
+            onChange={(v) => tabla.setColumnFilter("vigencia", v)}
             options={VIGENCIA_OPTIONS}
-            dateValue={columnFilters.fechaHasta}
-            onDateChange={(v) => setColumnFilter("fechaHasta", v)}
-            sortDirection={sort?.campo === "fechaHasta" ? sort.order : null}
-            onSortToggle={() => toggleSort("fechaHasta")}
+            dateValue={tabla.columnFilters.fechaHasta}
+            onDateChange={(v) => tabla.setColumnFilter("fechaHasta", v)}
+            sortDirection={tabla.sort?.campo === "fechaHasta" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("fechaHasta")}
           />
         </SortableResizableHead>
       ),
@@ -710,14 +640,14 @@ export default function OfertasView() {
             <Input
               id="ofertas-search"
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={tabla.search}
+              onChange={(e) => tabla.setSearch(e.target.value)}
               placeholder="Ej: 65/0001, S4 36 DA, Bosch..."
             />
           </div>
 
-          {hayFiltrosActivos && (
-            <Button variant="outline" onClick={limpiarFiltros}>
+          {tabla.hayFiltrosActivos && (
+            <Button variant="outline" onClick={tabla.limpiarFiltros}>
               Limpiar filtros
             </Button>
           )}
@@ -745,7 +675,7 @@ export default function OfertasView() {
             <span className="text-zinc-700 dark:text-zinc-300">Ver cerradas/vencidas</span>
           </label>
           <label className="flex cursor-pointer items-center gap-2">
-            <Switch checked={verEliminadas} onCheckedChange={setVerEliminadas} />
+            <Switch checked={tabla.verEliminados} onCheckedChange={tabla.setVerEliminados} />
             <span className="text-zinc-700 dark:text-zinc-300">Ver eliminadas (papelera)</span>
           </label>
         </div>
@@ -756,17 +686,17 @@ export default function OfertasView() {
         data={data}
         rangoResultados={rangoResultados}
         pageSizeOptions={PAGE_SIZES}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageChange={tabla.setPage}
+        onPageSizeChange={tabla.setPageSize}
         className="mb-2"
       />
 
-      {selectedIds.size > 0 && (
+      {tabla.selectedIds.size > 0 && (
         <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
-            {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
+            {tabla.selectedIds.size} seleccionada{tabla.selectedIds.size > 1 ? "s" : ""}
           </span>
-          {verEliminadas ? (
+          {tabla.verEliminados ? (
             // En la papelera lo único que se puede hacer es restaurar.
             <Button variant="outline" size="sm" onClick={restaurarSeleccion} disabled={cambiandoEstado}>
               {cambiandoEstado ? "Restaurando…" : "Restaurar"}
@@ -818,7 +748,7 @@ export default function OfertasView() {
                 <Checkbox
                   checked={allSelected}
                   indeterminate={someSelected}
-                  onCheckedChange={toggleAll}
+                  onCheckedChange={(checked) => tabla.toggleAll(visibleIds, Boolean(checked))}
                   aria-label="Seleccionar todo"
                 />
               </TableHead>
@@ -863,8 +793,8 @@ export default function OfertasView() {
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
-                        checked={selectedIds.has(oferta.id)}
-                        onCheckedChange={() => toggleRow(oferta.id)}
+                        checked={tabla.selectedIds.has(oferta.id)}
+                        onCheckedChange={() => tabla.toggleRow(oferta.id)}
                         aria-label="Seleccionar fila"
                       />
                     </TableCell>
@@ -922,8 +852,8 @@ export default function OfertasView() {
         data={data}
         rangoResultados={rangoResultados}
         pageSizeOptions={PAGE_SIZES}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageChange={tabla.setPage}
+        onPageSizeChange={tabla.setPageSize}
         className="mt-2"
       />
 
@@ -937,16 +867,16 @@ export default function OfertasView() {
         />
       )}
       <NuevaOfertaDialog open={nuevoOpen} onOpenChange={setNuevoOpen} onCreated={handleCreated} />
-      {editOpen && !selectedOferta && selectedIds.size > 1 && (
+      {editOpen && !selectedOferta && tabla.selectedIds.size > 1 && (
         <BulkEditarOfertaDialog
-          ids={[...selectedIds]}
+          ids={[...tabla.selectedIds]}
           open={editOpen}
           onOpenChange={setEditOpen}
           onUpdated={handleBulkUpdated}
         />
       )}
       <EliminarOfertasDialog
-        ids={[...selectedIds]}
+        ids={[...tabla.selectedIds]}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         onDeleted={handleDeleted}
