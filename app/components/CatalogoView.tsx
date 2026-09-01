@@ -185,15 +185,9 @@ export default function CatalogoView() {
     setColumnOrder(arrayMove(columnOrder, oldIndex, newIndex));
   }
 
-  // El hook no expone el término debounced (lo usa solo internamente para
-  // armar los params); acá lo re-derivamos nada más que para el resaltado
-  // (HighlightText), que debe seguir el término ya confirmado y no cada
-  // tecla mientras se sigue escribiendo.
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(tabla.search), 300);
-    return () => clearTimeout(id);
-  }, [tabla.search]);
+  // Para el resaltado se usa el término ya confirmado por el debounce, no el
+  // crudo (ver comentario en useTablaRecurso).
+  const debouncedSearch = tabla.debouncedSearch;
 
   useEffect(() => {
     let active = true;

@@ -116,6 +116,12 @@ export function useTablaRecurso<TFilters extends Record<string, string>>(opcione
   return {
     search,
     setSearch,
+    // El término ya confirmado por el debounce. Se expone además del `search`
+    // crudo porque el resaltado de resultados (HighlightText) tiene que seguir
+    // este y no cada tecla: con el valor crudo, tipear una letra sobre una
+    // búsqueda vigente hace parpadear el resaltado antes de que el fetch
+    // nuevo siquiera arranque.
+    debouncedSearch,
     columnFilters,
     setColumnFilter,
     limpiarFiltros,
