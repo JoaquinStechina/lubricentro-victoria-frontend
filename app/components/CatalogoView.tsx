@@ -15,6 +15,7 @@ import { SortableContext, arrayMove, horizontalListSortingStrategy, sortableKeyb
 import { apiFetch, apiJsonInit, imagenSrc } from "@/app/lib/api";
 import type { Producto, ProductoColumnKey } from "@/app/lib/productos";
 import { useColumnPrefs } from "@/app/lib/useColumnPrefs";
+import { useTablaRecurso } from "@/app/lib/useTablaRecurso";
 import ColumnFilterHeader from "@/app/components/ColumnFilterHeader";
 import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/ColumnVisibilityMenu";
 import ExportarButton from "@/app/components/ExportarButton";
@@ -110,8 +111,6 @@ const EMPTY_COLUMN_FILTERS: Record<ProductoColumnKey, string> = {
   fechaVigencia: "",
 };
 
-type SortState = { campo: string; order: "asc" | "desc" } | null;
-
 const currencyFormatter = new Intl.NumberFormat("es-AR", {
   style: "currency",
   currency: "ARS",
@@ -131,17 +130,14 @@ function formatPorcentaje(valor: number | null) {
 }
 
 export default function CatalogoView() {
-  const [search, setSearch] = useState("");
-  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
-  const [sort, setSort] = useState<SortState>(null);
-  const [verEliminados, setVerEliminados] = useState(false);
+  const tabla = useTablaRecurso({
+    filtrosIniciales: EMPTY_COLUMN_FILTERS,
+    pageSizeInicial: PAGE_SIZES[0],
+  });
   const [restaurando, setRestaurando] = useState(false);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
-  const [reloadTick, setReloadTick] = useState(0);
 
   // Valores para el combobox del filtro de Sección; si el fetch falla el
   // filtro simplemente queda vacío (se puede seguir usando el resto).
@@ -158,7 +154,6 @@ export default function CatalogoView() {
     };
   }, []);
 
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [nuevoOpen, setNuevoOpen] = useState(false);
@@ -190,57 +185,19 @@ export default function CatalogoView() {
     setColumnOrder(arrayMove(columnOrder, oldIndex, newIndex));
   }
 
-  // Debounce los campos de texto para no disparar un fetch por cada tecla.
+  // El hook no expone el término debounced (lo usa solo internamente para
+  // armar los params); acá lo re-derivamos nada más que para el resaltado
+  // (HighlightText), que debe seguir el término ya confirmado y no cada
+  // tecla mientras se sigue escribiendo.
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [debouncedColumnFilters, setDebouncedColumnFilters] = useState(
-    EMPTY_COLUMN_FILTERS
-  );
   useEffect(() => {
-    const id = setTimeout(() => {
-      setDebouncedSearch(search);
-      setDebouncedColumnFilters(columnFilters);
-    }, 300);
+    const id = setTimeout(() => setDebouncedSearch(tabla.search), 300);
     return () => clearTimeout(id);
-  }, [search, columnFilters]);
-
-  function setColumnFilter(key: ProductoColumnKey, value: string) {
-    setColumnFilters((prev) => ({ ...prev, [key]: value }));
-  }
-
-  // El ciclo de orden por columna es asc → desc → sin orden; ordenar por
-  // otra columna arranca de nuevo en asc.
-  function toggleSort(campo: string) {
-    setSort((prev) => {
-      if (!prev || prev.campo !== campo) return { campo, order: "asc" };
-      if (prev.order === "asc") return { campo, order: "desc" };
-      return null;
-    });
-  }
-
-  // Cualquier cambio de filtro/orden/tamaño vuelve a la página 1 (ajuste de
-  // estado durante el render, ver
-  // https://react.dev/learn/you-might-not-need-an-effect).
-  const filterKey = `${debouncedSearch}|${JSON.stringify(debouncedColumnFilters)}|${JSON.stringify(sort)}|${pageSize}|${verEliminados}`;
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
-  if (filterKey !== prevFilterKey) {
-    setPrevFilterKey(filterKey);
-    setPage(1);
-  }
+  }, [tabla.search]);
 
   useEffect(() => {
     let active = true;
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    for (const [key, value] of Object.entries(debouncedColumnFilters)) {
-      if (value) params.set(`f_${key}`, value);
-    }
-    if (sort) {
-      params.set("sort", sort.campo);
-      params.set("order", sort.order);
-    }
-    if (verEliminados) params.set("incluirEliminados", "true");
-    params.set("page", String(page));
-    params.set("pageSize", String(pageSize));
+    const params = tabla.buildParams(true);
 
     async function load() {
       setLoading(true);
@@ -249,7 +206,7 @@ export default function CatalogoView() {
         if (active) {
           setData(json);
           setExpandedRow(null);
-          setSelectedIds(new Set());
+          tabla.clearSelection();
         }
       } finally {
         if (active) setLoading(false);
@@ -260,38 +217,19 @@ export default function CatalogoView() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, debouncedColumnFilters, sort, verEliminados, page, pageSize, reloadTick]);
-
-  const hayFiltrosActivos =
-    search || Object.values(columnFilters).some((v) => v);
-
-  function limpiarFiltros() {
-    setSearch("");
-    setColumnFilters(EMPTY_COLUMN_FILTERS);
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabla.fetchKey]);
 
   // Mismos filtros/orden que la tabla, sin page/pageSize: el export baja el
   // resultado completo (ver GET /api/productos/export).
-  function buildExportParams() {
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set("search", debouncedSearch);
-    for (const [key, value] of Object.entries(debouncedColumnFilters)) {
-      if (value) params.set(`f_${key}`, value);
-    }
-    if (sort) {
-      params.set("sort", sort.campo);
-      params.set("order", sort.order);
-    }
-    if (verEliminados) params.set("incluirEliminados", "true");
-    return params;
-  }
+  const buildExportParams = () => tabla.buildParams(false);
 
   async function restaurarSeleccion() {
     setRestaurando(true);
     try {
-      await apiFetch(`/api/productos/restaurar`, apiJsonInit({ ids: [...selectedIds] }));
-      setSelectedIds(new Set());
-      setReloadTick((t) => t + 1);
+      await apiFetch(`/api/productos/restaurar`, apiJsonInit({ ids: [...tabla.selectedIds] }));
+      tabla.clearSelection();
+      tabla.recargar();
     } finally {
       setRestaurando(false);
     }
@@ -305,29 +243,17 @@ export default function CatalogoView() {
   }, [data]);
 
   const visibleIds = data?.items.map((p) => p.id) ?? [];
-  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
-  const someSelected = !allSelected && visibleIds.some((id) => selectedIds.has(id));
-
-  function toggleAll() {
-    setSelectedIds(allSelected ? new Set() : new Set(visibleIds));
-  }
-  function toggleRow(id: number) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => tabla.selectedIds.has(id));
+  const someSelected = !allSelected && visibleIds.some((id) => tabla.selectedIds.has(id));
 
   const selectedProducto =
-    selectedIds.size === 1 ? (data?.items.find((p) => selectedIds.has(p.id)) ?? null) : null;
+    tabla.selectedIds.size === 1 ? (data?.items.find((p) => tabla.selectedIds.has(p.id)) ?? null) : null;
 
   function handleSingleUpdated(actualizado: Producto) {
     setData((prev) =>
       prev ? { ...prev, items: prev.items.map((p) => (p.id === actualizado.id ? actualizado : p)) } : prev
     );
-    setSelectedIds(new Set());
+    tabla.clearSelection();
   }
   // A diferencia de handleSingleUpdated, no toca selectedIds: se usa para la
   // subida/borrado de imagen dentro del diálogo de edición, una acción
@@ -340,12 +266,12 @@ export default function CatalogoView() {
     );
   }
   function handleBulkUpdated() {
-    setSelectedIds(new Set());
-    setReloadTick((t) => t + 1);
+    tabla.clearSelection();
+    tabla.recargar();
   }
   function handleCreated() {
-    setPage(1);
-    setReloadTick((t) => t + 1);
+    tabla.setPage(1);
+    tabla.recargar();
   }
   function handleDeleted(ids: number[]) {
     const eliminados = new Set(ids);
@@ -358,7 +284,7 @@ export default function CatalogoView() {
           }
         : prev
     );
-    setSelectedIds(new Set());
+    tabla.clearSelection();
   }
 
   // Cada entrada envuelve exactamente el mismo JSX que antes estaba
@@ -374,10 +300,10 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="Proveedor"
-            value={columnFilters.proveedor}
-            onChange={(v) => setColumnFilter("proveedor", v)}
-            sortDirection={sort?.campo === "proveedor" ? sort.order : null}
-            onSortToggle={() => toggleSort("proveedor")}
+            value={tabla.columnFilters.proveedor}
+            onChange={(v) => tabla.setColumnFilter("proveedor", v)}
+            sortDirection={tabla.sort?.campo === "proveedor" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("proveedor")}
           />
         </SortableResizableHead>
       ),
@@ -400,10 +326,10 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="Marca"
-            value={columnFilters.marca}
-            onChange={(v) => setColumnFilter("marca", v)}
-            sortDirection={sort?.campo === "marca" ? sort.order : null}
-            onSortToggle={() => toggleSort("marca")}
+            value={tabla.columnFilters.marca}
+            onChange={(v) => tabla.setColumnFilter("marca", v)}
+            sortDirection={tabla.sort?.campo === "marca" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("marca")}
           />
         </SortableResizableHead>
       ),
@@ -423,10 +349,10 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="SKU interno"
-            value={columnFilters.sku}
-            onChange={(v) => setColumnFilter("sku", v)}
-            sortDirection={sort?.campo === "sku" ? sort.order : null}
-            onSortToggle={() => toggleSort("sku")}
+            value={tabla.columnFilters.sku}
+            onChange={(v) => tabla.setColumnFilter("sku", v)}
+            sortDirection={tabla.sort?.campo === "sku" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("sku")}
           />
         </SortableResizableHead>
       ),
@@ -449,10 +375,10 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="SKU proveedor"
-            value={columnFilters.skuProveedor}
-            onChange={(v) => setColumnFilter("skuProveedor", v)}
-            sortDirection={sort?.campo === "skuProveedor" ? sort.order : null}
-            onSortToggle={() => toggleSort("skuProveedor")}
+            value={tabla.columnFilters.skuProveedor}
+            onChange={(v) => tabla.setColumnFilter("skuProveedor", v)}
+            sortDirection={tabla.sort?.campo === "skuProveedor" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("skuProveedor")}
           />
         </SortableResizableHead>
       ),
@@ -472,10 +398,10 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="Descripción"
-            value={columnFilters.descripcion}
-            onChange={(v) => setColumnFilter("descripcion", v)}
-            sortDirection={sort?.campo === "descripcion" ? sort.order : null}
-            onSortToggle={() => toggleSort("descripcion")}
+            value={tabla.columnFilters.descripcion}
+            onChange={(v) => tabla.setColumnFilter("descripcion", v)}
+            sortDirection={tabla.sort?.campo === "descripcion" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("descripcion")}
           />
         </SortableResizableHead>
       ),
@@ -495,11 +421,11 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="Sección"
-            value={columnFilters.seccion}
-            onChange={(v) => setColumnFilter("seccion", v)}
+            value={tabla.columnFilters.seccion}
+            onChange={(v) => tabla.setColumnFilter("seccion", v)}
             searchOptions={secciones}
-            sortDirection={sort?.campo === "seccion" ? sort.order : null}
-            onSortToggle={() => toggleSort("seccion")}
+            sortDirection={tabla.sort?.campo === "seccion" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("seccion")}
           />
         </SortableResizableHead>
       ),
@@ -522,13 +448,14 @@ export default function CatalogoView() {
             label="Precio neto"
             value=""
             onChange={() => {}}
-            rangeValue={{ min: columnFilters.precioNetoMin, max: columnFilters.precioNetoMax }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({ ...prev, precioNetoMin: min, precioNetoMax: max }))
-            }
+            rangeValue={{ min: tabla.columnFilters.precioNetoMin, max: tabla.columnFilters.precioNetoMax }}
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("precioNetoMin", min);
+              tabla.setColumnFilter("precioNetoMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "precioNeto" ? sort.order : null}
-            onSortToggle={() => toggleSort("precioNeto")}
+            sortDirection={tabla.sort?.campo === "precioNeto" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("precioNeto")}
           />
         </SortableResizableHead>
       ),
@@ -552,19 +479,16 @@ export default function CatalogoView() {
             value=""
             onChange={() => {}}
             rangeValue={{
-              min: columnFilters.precioConIvaMin,
-              max: columnFilters.precioConIvaMax,
+              min: tabla.columnFilters.precioConIvaMin,
+              max: tabla.columnFilters.precioConIvaMax,
             }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({
-                ...prev,
-                precioConIvaMin: min,
-                precioConIvaMax: max,
-              }))
-            }
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("precioConIvaMin", min);
+              tabla.setColumnFilter("precioConIvaMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "precioConIva" ? sort.order : null}
-            onSortToggle={() => toggleSort("precioConIva")}
+            sortDirection={tabla.sort?.campo === "precioConIva" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("precioConIva")}
           />
         </SortableResizableHead>
       ),
@@ -588,19 +512,16 @@ export default function CatalogoView() {
             value=""
             onChange={() => {}}
             rangeValue={{
-              min: columnFilters.precioListaMin,
-              max: columnFilters.precioListaMax,
+              min: tabla.columnFilters.precioListaMin,
+              max: tabla.columnFilters.precioListaMax,
             }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({
-                ...prev,
-                precioListaMin: min,
-                precioListaMax: max,
-              }))
-            }
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("precioListaMin", min);
+              tabla.setColumnFilter("precioListaMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "precioLista" ? sort.order : null}
-            onSortToggle={() => toggleSort("precioLista")}
+            sortDirection={tabla.sort?.campo === "precioLista" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("precioLista")}
           />
         </SortableResizableHead>
       ),
@@ -624,19 +545,16 @@ export default function CatalogoView() {
             value=""
             onChange={() => {}}
             rangeValue={{
-              min: columnFilters.precioListaConIvaMin,
-              max: columnFilters.precioListaConIvaMax,
+              min: tabla.columnFilters.precioListaConIvaMin,
+              max: tabla.columnFilters.precioListaConIvaMax,
             }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({
-                ...prev,
-                precioListaConIvaMin: min,
-                precioListaConIvaMax: max,
-              }))
-            }
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("precioListaConIvaMin", min);
+              tabla.setColumnFilter("precioListaConIvaMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "precioListaConIva" ? sort.order : null}
-            onSortToggle={() => toggleSort("precioListaConIva")}
+            sortDirection={tabla.sort?.campo === "precioListaConIva" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("precioListaConIva")}
           />
         </SortableResizableHead>
       ),
@@ -660,19 +578,16 @@ export default function CatalogoView() {
             value=""
             onChange={() => {}}
             rangeValue={{
-              min: columnFilters.precioSugeridoMin,
-              max: columnFilters.precioSugeridoMax,
+              min: tabla.columnFilters.precioSugeridoMin,
+              max: tabla.columnFilters.precioSugeridoMax,
             }}
-            onRangeChange={(min, max) =>
-              setColumnFilters((prev) => ({
-                ...prev,
-                precioSugeridoMin: min,
-                precioSugeridoMax: max,
-              }))
-            }
+            onRangeChange={(min, max) => {
+              tabla.setColumnFilter("precioSugeridoMin", min);
+              tabla.setColumnFilter("precioSugeridoMax", max);
+            }}
             align="right"
-            sortDirection={sort?.campo === "precioSugerido" ? sort.order : null}
-            onSortToggle={() => toggleSort("precioSugerido")}
+            sortDirection={tabla.sort?.campo === "precioSugerido" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("precioSugerido")}
           />
         </SortableResizableHead>
       ),
@@ -693,11 +608,11 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="IVA %"
-            value={columnFilters.alicuotaIva}
-            onChange={(v) => setColumnFilter("alicuotaIva", v)}
+            value={tabla.columnFilters.alicuotaIva}
+            onChange={(v) => tabla.setColumnFilter("alicuotaIva", v)}
             align="right"
-            sortDirection={sort?.campo === "alicuotaIva" ? sort.order : null}
-            onSortToggle={() => toggleSort("alicuotaIva")}
+            sortDirection={tabla.sort?.campo === "alicuotaIva" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("alicuotaIva")}
           />
         </SortableResizableHead>
       ),
@@ -720,10 +635,10 @@ export default function CatalogoView() {
         >
           <ColumnFilterHeader
             label="Vigencia"
-            value={columnFilters.fechaVigencia}
-            onChange={(v) => setColumnFilter("fechaVigencia", v)}
-            sortDirection={sort?.campo === "fechaVigencia" ? sort.order : null}
-            onSortToggle={() => toggleSort("fechaVigencia")}
+            value={tabla.columnFilters.fechaVigencia}
+            onChange={(v) => tabla.setColumnFilter("fechaVigencia", v)}
+            sortDirection={tabla.sort?.campo === "fechaVigencia" ? tabla.sort.order : null}
+            onSortToggle={() => tabla.toggleSort("fechaVigencia")}
           />
         </SortableResizableHead>
       ),
@@ -752,14 +667,14 @@ export default function CatalogoView() {
             <Input
               id="catalogo-search"
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={tabla.search}
+              onChange={(e) => tabla.setSearch(e.target.value)}
               placeholder="Ej: 2351, filtro de aceite, Bosch, Vigencia..."
             />
           </div>
 
-          {hayFiltrosActivos && (
-            <Button variant="outline" onClick={limpiarFiltros}>
+          {tabla.hayFiltrosActivos && (
+            <Button variant="outline" onClick={tabla.limpiarFiltros}>
               Limpiar filtros
             </Button>
           )}
@@ -783,7 +698,7 @@ export default function CatalogoView() {
         </div>
         <div className="flex items-center gap-5 text-sm">
           <label className="flex cursor-pointer items-center gap-2">
-            <Switch checked={verEliminados} onCheckedChange={setVerEliminados} />
+            <Switch checked={tabla.verEliminados} onCheckedChange={tabla.setVerEliminados} />
             <span className="text-zinc-700 dark:text-zinc-300">Ver eliminados (papelera)</span>
           </label>
         </div>
@@ -794,17 +709,17 @@ export default function CatalogoView() {
         data={data}
         rangoResultados={rangoResultados}
         pageSizeOptions={PAGE_SIZES}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageChange={tabla.setPage}
+        onPageSizeChange={tabla.setPageSize}
         className="mb-2"
       />
 
-      {selectedIds.size > 0 && (
+      {tabla.selectedIds.size > 0 && (
         <div className="mb-2 flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900">
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
-            {selectedIds.size} seleccionada{selectedIds.size > 1 ? "s" : ""}
+            {tabla.selectedIds.size} seleccionada{tabla.selectedIds.size > 1 ? "s" : ""}
           </span>
-          {verEliminados ? (
+          {tabla.verEliminados ? (
             // En la papelera lo único que se puede hacer es restaurar.
             <Button variant="outline" size="sm" onClick={restaurarSeleccion} disabled={restaurando}>
               {restaurando ? "Restaurando…" : "Restaurar"}
@@ -830,7 +745,7 @@ export default function CatalogoView() {
                 <Checkbox
                   checked={allSelected}
                   indeterminate={someSelected}
-                  onCheckedChange={toggleAll}
+                  onCheckedChange={(checked) => tabla.toggleAll(visibleIds, Boolean(checked))}
                   aria-label="Seleccionar todo"
                 />
               </TableHead>
@@ -880,8 +795,8 @@ export default function CatalogoView() {
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
-                        checked={selectedIds.has(producto.id)}
-                        onCheckedChange={() => toggleRow(producto.id)}
+                        checked={tabla.selectedIds.has(producto.id)}
+                        onCheckedChange={() => tabla.toggleRow(producto.id)}
                         aria-label="Seleccionar fila"
                       />
                     </TableCell>
@@ -939,8 +854,8 @@ export default function CatalogoView() {
         data={data}
         rangoResultados={rangoResultados}
         pageSizeOptions={PAGE_SIZES}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageChange={tabla.setPage}
+        onPageSizeChange={tabla.setPageSize}
         className="mt-2"
       />
 
@@ -954,16 +869,16 @@ export default function CatalogoView() {
         />
       )}
       <NuevoProductoDialog open={nuevoOpen} onOpenChange={setNuevoOpen} onCreated={handleCreated} />
-      {editOpen && !selectedProducto && selectedIds.size > 1 && (
+      {editOpen && !selectedProducto && tabla.selectedIds.size > 1 && (
         <BulkEditarProductoDialog
-          ids={[...selectedIds]}
+          ids={[...tabla.selectedIds]}
           open={editOpen}
           onOpenChange={setEditOpen}
           onUpdated={handleBulkUpdated}
         />
       )}
       <EliminarProductosDialog
-        ids={[...selectedIds]}
+        ids={[...tabla.selectedIds]}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         onDeleted={handleDeleted}
