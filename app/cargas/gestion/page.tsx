@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, PackageIcon } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,12 @@ export default function GestionPage() {
             >
               <ArrowLeftIcon className="size-3.5" />
               Cargas
+            </Link>
+            <Link href="/stock">
+              <Button variant="outline">
+                <PackageIcon />
+                Stock
+              </Button>
             </Link>
             <ThemeToggle />
           </div>

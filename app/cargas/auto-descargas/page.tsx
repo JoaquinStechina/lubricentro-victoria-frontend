@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, PackageIcon } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import AutoDescargasView from "@/app/components/autoDescargas/AutoDescargasView";
+import { Button } from "@/components/ui/button";
 
 export default function AutoDescargasPage() {
   return (
@@ -17,6 +18,12 @@ export default function AutoDescargasPage() {
             >
               <ArrowLeftIcon className="size-3.5" />
               Cargas
+            </Link>
+            <Link href="/stock">
+              <Button variant="outline">
+                <PackageIcon />
+                Stock
+              </Button>
             </Link>
             <ThemeToggle />
           </div>

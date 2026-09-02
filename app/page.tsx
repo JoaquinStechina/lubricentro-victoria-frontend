@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { UploadCloudIcon } from "lucide-react";
+import { PackageIcon, UploadCloudIcon } from "lucide-react";
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -32,6 +32,12 @@ export default function Home() {
               <Button variant="outline">
                 <UploadCloudIcon />
                 Cargar archivo
+              </Button>
+            </Link>
+            <Link href="/stock">
+              <Button variant="outline">
+                <PackageIcon />
+                Stock
               </Button>
             </Link>
             <ThemeToggle />

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, PackageIcon } from "lucide-react";
 import { apiFetch } from "@/app/lib/api";
 import { ESTADO_LABELS, TIPO_DATOS_LABELS, type Carga, type CargaEstado } from "@/app/lib/cargas";
 import UploadForm from "@/app/components/cargas/UploadForm";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const BADGE_VARIANT: Record<CargaEstado, "secondary" | "default" | "outline" | "destructive"> = {
@@ -72,6 +73,12 @@ export default function CargasPage() {
                 className="text-sm text-primary hover:underline whitespace-nowrap"
               >
                 Auto-descargas
+              </Link>
+              <Link href="/stock">
+                <Button variant="outline">
+                  <PackageIcon />
+                  Stock
+                </Button>
               </Link>
               <ThemeToggle />
             </div>
