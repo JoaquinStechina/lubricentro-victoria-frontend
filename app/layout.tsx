@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lubricentro Victoria — Catálogo de proveedores",
+  title: "Lubricentro Victoria",
   description:
     "Sistema interno de Lubricentro Victoria: catálogo de precios de proveedores, ofertas vigentes y control de stock.",
 };
