@@ -22,10 +22,6 @@ export default function Home() {
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
               Catálogo centralizado de proveedores
             </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Prototipo de visualización sobre las listas de precios y ofertas
-              ya parseadas.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/cargas">
