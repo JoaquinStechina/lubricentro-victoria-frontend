@@ -469,7 +469,14 @@ export default function StockView() {
               </DndContext>
               {sortOnlyHead("Cantidad", "cantidad", "w-40")}
               {sortOnlyHead("Mínimo", "minimo", "w-24")}
-              <TableHead aria-label="Acciones" className="w-32" />
+              {/* Anclada a la derecha: con las columnas por defecto la tabla
+                  desborda el ancho de pantalla, y si estas acciones scrollean
+                  con el resto quedan invisibles (no hay otra forma de
+                  registrar un movimiento desde la fila). */}
+              <TableHead
+                aria-label="Acciones"
+                className="sticky right-0 z-10 w-32 border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -520,7 +527,7 @@ export default function StockView() {
                   <TableCell className="text-right text-zinc-700 dark:text-zinc-300">
                     {articulo.minimo ?? <span className="text-zinc-400 dark:text-zinc-600">—</span>}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="sticky right-0 z-10 border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
                     <div className="flex items-center gap-1">
                       <MovimientoDialog articulo={articulo} onRegistrado={tabla.recargar} />
                       <EditarArticuloDialog articulo={articulo} onEditado={tabla.recargar} />
