@@ -441,6 +441,17 @@ export default function StockView() {
         </div>
       )}
 
+      {/* DndContext va FUERA de la tabla a propósito: renderiza un <div> de
+          accesibilidad como hermano de sus hijos, y adentro de un <tr> el
+          navegador lo trata como una celda anónima que corre una posición
+          todas las columnas siguientes (Cantidad y Mínimo quedaban bajo el
+          encabezado equivocado). SortableContext no emite DOM, así que puede
+          quedarse adentro de la fila. */}
+      <DndContext
+        sensors={columnDragSensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleColumnDragEnd}
+      >
       <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <Table className="table-fixed">
           <TableHeader>
@@ -453,22 +464,19 @@ export default function StockView() {
                   aria-label="Seleccionar todo"
                 />
               </TableHead>
-              <DndContext
-                sensors={columnDragSensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleColumnDragEnd}
+              <SortableContext
+                items={visibleColumnDefs.map(({ key }) => key)}
+                strategy={horizontalListSortingStrategy}
               >
-                <SortableContext
-                  items={visibleColumnDefs.map(({ key }) => key)}
-                  strategy={horizontalListSortingStrategy}
-                >
-                  {visibleColumnDefs.map(({ key, def }) => (
-                    <Fragment key={key}>{def.header()}</Fragment>
-                  ))}
-                </SortableContext>
-              </DndContext>
-              {sortOnlyHead("Cantidad", "cantidad", "w-40")}
-              {sortOnlyHead("Mínimo", "minimo", "w-24")}
+                {visibleColumnDefs.map(({ key, def }) => (
+                  <Fragment key={key}>{def.header()}</Fragment>
+                ))}
+              </SortableContext>
+              {/* "Cantidad mínima" y no "Mínimo": al lado de "Cantidad", un
+                  encabezado de una sola palabra se lee como si los dos números
+                  fueran de la misma columna. */}
+              {sortOnlyHead("Cantidad", "cantidad", "w-32")}
+              {sortOnlyHead("Cantidad mínima", "minimo", "w-36")}
               {/* Anclada a la derecha: con las columnas por defecto la tabla
                   desborda el ancho de pantalla, y si estas acciones scrollean
                   con el resto quedan invisibles (no hay otra forma de
@@ -547,6 +555,7 @@ export default function StockView() {
           </TableBody>
         </Table>
       </div>
+      </DndContext>
 
       <TablePaginationBar
         loading={loading}

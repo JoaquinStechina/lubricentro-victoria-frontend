@@ -740,6 +740,16 @@ export default function OfertasView() {
         </div>
       )}
 
+      {/* DndContext va FUERA de la tabla a propósito: renderiza un <div> de
+          accesibilidad como hermano de sus hijos, y adentro de un <tr> el
+          navegador lo trata como una celda anónima que corre una posición
+          todas las columnas siguientes. SortableContext no emite DOM, así que
+          puede quedarse adentro de la fila. */}
+      <DndContext
+        sensors={columnDragSensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleColumnDragEnd}
+      >
       <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <Table className="table-fixed">
           <TableHeader>
@@ -753,20 +763,14 @@ export default function OfertasView() {
                 />
               </TableHead>
               <TableHead aria-label="Imagen" className="w-14" />
-              <DndContext
-                sensors={columnDragSensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleColumnDragEnd}
+              <SortableContext
+                items={visibleColumnDefs.map(({ key }) => key)}
+                strategy={horizontalListSortingStrategy}
               >
-                <SortableContext
-                  items={visibleColumnDefs.map(({ key }) => key)}
-                  strategy={horizontalListSortingStrategy}
-                >
-                  {visibleColumnDefs.map(({ key, def }) => (
-                    <Fragment key={key}>{def.header()}</Fragment>
-                  ))}
-                </SortableContext>
-              </DndContext>
+                {visibleColumnDefs.map(({ key, def }) => (
+                  <Fragment key={key}>{def.header()}</Fragment>
+                ))}
+              </SortableContext>
               <TableHead aria-label="Historial" className="w-12" />
             </TableRow>
           </TableHeader>
@@ -846,6 +850,7 @@ export default function OfertasView() {
           </TableBody>
         </Table>
       </div>
+      </DndContext>
 
       <TablePaginationBar
         loading={loading}
