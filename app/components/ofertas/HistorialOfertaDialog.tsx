@@ -63,11 +63,21 @@ export default function HistorialOfertaDialog({
   const [items, setItems] = useState<HistorialItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Reset a "cargando" al abrirse o al cambiar de oferta: se hace durante el
+  // render y no adentro del efecto, porque un setState sincronico en el
+  // cuerpo de un efecto dispara un render en cascada
+  // (react-hooks/set-state-in-effect). Mismo criterio que useTablaRecurso.
+  const claveVista = `${oferta.id}|${open}`;
+  const [prevClaveVista, setPrevClaveVista] = useState(claveVista);
+  if (prevClaveVista !== claveVista) {
+    setPrevClaveVista(claveVista);
+    setItems(null);
+    setError(null);
+  }
+
   useEffect(() => {
     if (!open) return;
     let active = true;
-    setItems(null);
-    setError(null);
     apiFetch<{ items: HistorialItem[] }>(`/api/ofertas/${oferta.id}/historial`)
       .then((res) => {
         if (active) setItems(res.items);

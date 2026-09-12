@@ -97,7 +97,6 @@ function CatalogoVigente() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     apiFetch<{ items: ProductoVigente[]; total: number }>("/api/productos?pageSize=100")
       .then((res) => {
         if (active) setData(res);
@@ -167,19 +166,36 @@ function OfertasActivas() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  function load(incluir: boolean) {
+  // Se incrementa para forzar un refetch despues de cerrar/reactivar, sin
+  // tener que tocar el filtro.
+  const [reloadTick, setReloadTick] = useState(0);
+
+  // Volver al estado de carga se hace aca, durante el render, y no adentro
+  // del efecto: un setState sincronico en el cuerpo de un efecto dispara un
+  // render en cascada (react-hooks/set-state-in-effect). Mismo criterio que
+  // useTablaRecurso.
+  const claveDeCarga = `${incluirCerradas}|${reloadTick}`;
+  const [prevClaveDeCarga, setPrevClaveDeCarga] = useState(claveDeCarga);
+  if (prevClaveDeCarga !== claveDeCarga) {
+    setPrevClaveDeCarga(claveDeCarga);
     setLoading(true);
-    const params = new URLSearchParams({ pageSize: "100" });
-    if (incluir) params.set("incluirCerradas", "true");
-    apiFetch<{ items: OfertaActiva[]; total: number }>(`/api/ofertas?${params.toString()}`)
-      .then((res) => setOfertas(res.items))
-      .finally(() => setLoading(false));
   }
 
   useEffect(() => {
-    load(incluirCerradas);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incluirCerradas]);
+    let active = true;
+    const params = new URLSearchParams({ pageSize: "100" });
+    if (incluirCerradas) params.set("incluirCerradas", "true");
+    apiFetch<{ items: OfertaActiva[]; total: number }>(`/api/ofertas?${params.toString()}`)
+      .then((res) => {
+        if (active) setOfertas(res.items);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [incluirCerradas, reloadTick]);
 
   // Cierra/reactiva TODOS los tramos (desde_cantidad distintos) de este
   // sku_proveedor dentro de esta oferta a la vez — ver POST /api/ofertas/
@@ -192,7 +208,7 @@ function OfertasActivas() {
         `/api/ofertas/${activar ? "reactivar" : "cerrar"}`,
         apiJsonInit({ proveedorId: o.proveedorId, numeroOferta: o.numeroOferta, skuProveedor: o.skuProveedor })
       );
-      load(incluirCerradas);
+      setReloadTick((t) => t + 1);
     } finally {
       setBusyId(null);
     }

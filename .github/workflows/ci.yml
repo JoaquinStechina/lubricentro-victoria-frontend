@@ -29,12 +29,8 @@ jobs:
       - name: Chequeo de tipos
         run: npx tsc --noEmit
 
-      # No bloquea todavía: hay 4 errores preexistentes de
-      # react-hooks/set-state-in-effect en app/components/ofertas/HistorialOfertaDialog.tsx.
-      # Cuando se arreglen, sacar continue-on-error para que empiece a gatear.
-      - name: Lint (informativo)
+      - name: Lint
         run: npx eslint .
-        continue-on-error: true
 
       # El build es el chequeo que de verdad importa acá: tsc no ve los
       # errores propios de Next (Server/Client Components, rutas, imports que
