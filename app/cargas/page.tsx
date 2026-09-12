@@ -7,9 +7,23 @@ import { apiFetch } from "@/app/lib/api";
 import { ESTADO_LABELS, TIPO_DATOS_LABELS, type Carga, type CargaEstado } from "@/app/lib/cargas";
 import UploadForm from "@/app/components/cargas/UploadForm";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import TablePaginationBar from "@/app/components/TablePaginationBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+type ApiResponse = {
+  items: Carga[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+// Más chicos que los de Catálogo/Ofertas/Stock (50-200) a propósito: esta
+// tabla crece de a un archivo subido, no de a miles de filas importadas, así
+// que con 50 por página la paginación no aparecería nunca.
+const PAGE_SIZES = [10, 25, 50, 100] as const;
 
 const BADGE_VARIANT: Record<CargaEstado, "secondary" | "default" | "outline" | "destructive"> = {
   pendiente: "secondary",
@@ -26,16 +40,31 @@ const dateFormatter = new Intl.DateTimeFormat("es-AR", {
 });
 
 export default function CargasPage() {
-  const [cargas, setCargas] = useState<Carga[] | null>(null);
+  const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
+
+  // Cambiar el tamaño de página vuelve a la primera: con 200 filas por página
+  // la página 4 de 50 ya no existe. Ajuste de estado durante el render, no un
+  // efecto (ver useTablaRecurso, mismo criterio).
+  const [prevPageSize, setPrevPageSize] = useState(pageSize);
+  if (pageSize !== prevPageSize) {
+    setPrevPageSize(pageSize);
+    setPage(1);
+  }
 
   useEffect(() => {
     let active = true;
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
     async function load() {
       setLoading(true);
       try {
-        const data = await apiFetch<Carga[]>("/api/uploads");
-        if (active) setCargas(data);
+        const json = await apiFetch<ApiResponse>(`/api/uploads?${params.toString()}`);
+        if (active) setData(json);
       } finally {
         if (active) setLoading(false);
       }
@@ -44,7 +73,13 @@ export default function CargasPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [page, pageSize]);
+
+  const rangoResultados = data
+    ? data.total === 0
+      ? "Sin cargas"
+      : `${(data.page - 1) * data.pageSize + 1}–${Math.min(data.page * data.pageSize, data.total)} de ${data.total.toLocaleString("es-AR")}`
+    : "";
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-black">
@@ -95,6 +130,16 @@ export default function CargasPage() {
           }}
         />
 
+        <TablePaginationBar
+          loading={loading}
+          data={data}
+          rangoResultados={rangoResultados}
+          pageSizeOptions={PAGE_SIZES}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          className="mb-2"
+        />
+
         <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <Table>
             <TableHeader>
@@ -116,48 +161,59 @@ export default function CargasPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!loading && cargas?.length === 0 && (
+              {!loading && data && data.items.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="py-8 text-center text-zinc-500 dark:text-zinc-400">
                     Todavía no se subió ningún archivo.
                   </TableCell>
                 </TableRow>
               )}
-              {cargas?.map((carga) => (
-                <TableRow key={carga.id}>
-                  <TableCell className="max-w-64 truncate text-zinc-900 dark:text-zinc-100">
-                    {carga.nombreArchivo}
-                  </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
-                    {carga.proveedor?.nombre ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300 uppercase">
-                    {carga.tipoArchivo}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={carga.tipoDatos === "oferta" ? "default" : "secondary"}>
-                      {TIPO_DATOS_LABELS[carga.tipoDatos]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={BADGE_VARIANT[carga.estado]}>{ESTADO_LABELS[carga.estado]}</Badge>
-                  </TableCell>
-                  <TableCell className="text-zinc-700 dark:text-zinc-300">
-                    {dateFormatter.format(new Date(carga.createdAt))}
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/cargas/${carga.id}`}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      {carga.estado === "completado" ? "Ver" : "Revisar"}
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {!loading &&
+                data?.items.map((carga) => (
+                  <TableRow key={carga.id}>
+                    <TableCell className="max-w-64 truncate text-zinc-900 dark:text-zinc-100">
+                      {carga.nombreArchivo}
+                    </TableCell>
+                    <TableCell className="text-zinc-700 dark:text-zinc-300">
+                      {carga.proveedor?.nombre ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-zinc-700 dark:text-zinc-300 uppercase">
+                      {carga.tipoArchivo}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={carga.tipoDatos === "oferta" ? "default" : "secondary"}>
+                        {TIPO_DATOS_LABELS[carga.tipoDatos]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={BADGE_VARIANT[carga.estado]}>{ESTADO_LABELS[carga.estado]}</Badge>
+                    </TableCell>
+                    <TableCell className="text-zinc-700 dark:text-zinc-300">
+                      {dateFormatter.format(new Date(carga.createdAt))}
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/cargas/${carga.id}`}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        {carga.estado === "completado" ? "Ver" : "Revisar"}
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </div>
+
+        <TablePaginationBar
+          loading={loading}
+          data={data}
+          rangoResultados={rangoResultados}
+          pageSizeOptions={PAGE_SIZES}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          className="mt-2"
+        />
       </main>
     </div>
   );
