@@ -304,6 +304,31 @@ export function varianteEstado(estado: string): VarianteBadge {
   }
 }
 
+// Tipos de documento del receptor (códigos de ARCA). El backend de clientes
+// acepta solo estos tres.
+export const TIPOS_DOC: { id: number; nombre: string }[] = [
+  { id: 80, nombre: "CUIT" },
+  { id: 86, nombre: "CUIL" },
+  { id: 96, nombre: "DNI" },
+];
+
+export function etiquetaTipoDoc(tipoDoc: number): string {
+  return TIPOS_DOC.find((t) => t.id === tipoDoc)?.nombre ?? `Doc. ${tipoDoc}`;
+}
+
+// "CUIT 30-12345678-9" / "DNI 12345678". El backend guarda solo dígitos; el
+// guionado de CUIT/CUIL es solo de presentación (y solo si tiene 11 dígitos).
+export function formatearDocumento(tipoDoc: number, nroDoc: string): string {
+  const esCuit = tipoDoc === 80 || tipoDoc === 86;
+  const nro =
+    esCuit && /^\d{11}$/.test(nroDoc) ? `${nroDoc.slice(0, 2)}-${nroDoc.slice(2, 10)}-${nroDoc.slice(10)}` : nroDoc;
+  return `${etiquetaTipoDoc(tipoDoc)} ${nro}`;
+}
+
+export function condicionIvaPorId(id: number) {
+  return CONDICIONES_IVA.find((c) => c.id === id);
+}
+
 const AMBIENTES: Record<Ambiente, string> = {
   simulado: "SIMULADO",
   homologacion: "HOMOLOGACIÓN",
