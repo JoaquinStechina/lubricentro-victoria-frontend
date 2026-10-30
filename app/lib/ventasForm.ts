@@ -23,6 +23,10 @@ export function etiquetaAlicuota(porcentaje: number): string {
   return `${String(porcentaje).replace(".", ",")} %`;
 }
 
+// Qué precio del catálogo se usó para precargar una fila (null si la fila se
+// armó a mano o el usuario tocó el precio después).
+export type OrigenPrecio = "neto" | "conIva" | "ninguno";
+
 export type ItemFormulario = {
   /** Identidad estable de la fila (no es el índice): ver ItemsEditor. */
   clave: string;
@@ -34,6 +38,10 @@ export type ItemFormulario = {
   /** Porcentaje como texto: es el valor del <Select>. */
   alicuotaIva: string;
   productoPrecioId: number | null;
+  /** De dónde salió el precio precargado; se limpia si el usuario edita el precio. */
+  origenPrecio: OrigenPrecio | null;
+  /** Avisos de la precarga que no cambian con la tilde de IVA (moneda, alícuota ajustada, sin precio). */
+  avisosCatalogo: string[];
 };
 
 // randomUUID solo existe en contextos seguros (https o localhost). Si la app se
@@ -54,13 +62,19 @@ export function itemVacio(): ItemFormulario {
     precioUnitario: "",
     alicuotaIva: String(ALICUOTA_POR_DEFECTO),
     productoPrecioId: null,
+    origenPrecio: null,
+    avisosCatalogo: [],
   };
 }
 
 // number -> texto para un input (coma decimal, como se escribe en es-AR).
 export function numeroATexto(n: number): string {
+  // Se redondea a 4 decimales (el máximo del precio): un precio con ruido de
+  // coma flotante (0.30000000000000004) llegaría al input como un valor que el
+  // propio validador rechaza por tener demasiados decimales.
+  const redondeado = Number(n.toFixed(4));
   // String(1e-7) da notación científica, que el parser no acepta.
-  const texto = String(n).includes("e") ? n.toFixed(4) : String(n);
+  const texto = String(redondeado).includes("e") ? redondeado.toFixed(4) : String(redondeado);
   return texto.replace(".", ",");
 }
 
@@ -69,15 +83,32 @@ type Parseo =
   | { tipo: "error"; mensaje: string }
   | { tipo: "ok"; valor: number; decimales: number };
 
-// Acepta "1234", "1234,56", "1234.56" y "12," (separador al final mientras se
-// tipea). Rechaza —en vez de adivinar— todo lo ambiguo: "1.234,56" o "1,234.56"
-// (separador de miles) y "1.2.3". Un usuario de es-AR que escribe "1.234" para
-// mil doscientos treinta y cuatro obtiene 1,234: el resumen de la derecha
-// muestra el importe real calculado por el backend para detectarlo.
+// Acepta "1234", "1234,56", "1234.56", ",5" y "12," (separador al final
+// mientras se tipea). Rechaza —en vez de adivinar— todo lo ambiguo:
+//  - "1.234" / "12.500": un solo punto seguido de exactamente 3 dígitos puede
+//    ser separador de miles (es-AR: mil doscientos treinta y cuatro) o decimal
+//    (1,234). Elegir en silencio convertiría un precio de $12.500 en $12,50.
+//  - "1.234,56" / "1,234.56" / "1.2.3": mezcla de separadores.
+// "1234.5" y "1234.56" (1, 2 o 4+ dígitos tras el punto) no son ambiguos.
 function parsearDecimal(texto: string): Parseo {
   const limpio = texto.trim();
   if (limpio === "") return { tipo: "vacio" };
   if (limpio.startsWith("-")) return { tipo: "error", mensaje: "No puede ser negativo." };
+  if (/^[1-9]\d{0,2}(?:\.\d{3})+$/.test(limpio)) {
+    const sinPuntos = limpio.replace(/\./g, "");
+    // Con más de un punto solo puede ser separador de miles (1.234.567).
+    if (limpio.split(".").length > 2) {
+      return {
+        tipo: "error",
+        mensaje: `Escribí el número sin puntos de miles (ej. ${sinPuntos}); para decimales usá la coma.`,
+      };
+    }
+    const comoDecimal = limpio.replace(".", ",");
+    return {
+      tipo: "error",
+      mensaje: `Es ambiguo: ¿${sinPuntos} o ${comoDecimal}? Escribí ${sinPuntos} si el punto es separador de miles, o ${comoDecimal} si es decimal.`,
+    };
+  }
   const m = /^(\d*)(?:[.,](\d*))?$/.exec(limpio);
   if (!m || (m[1] === "" && !m[2])) {
     return {
@@ -90,6 +121,9 @@ function parsearDecimal(texto: string): Parseo {
   const valor = Number(fraccion ? `${entera}.${fraccion}` : entera);
   return { tipo: "ok", valor, decimales: fraccion.length };
 }
+
+// Exportado para poder probar el parser en aislamiento (no hay runner de tests en el repo).
+export { parsearDecimal };
 
 export type CampoNumerico = { valor: number | null; error: string | null };
 

@@ -116,6 +116,9 @@ export default function VentasPage() {
     if (r && r.tipo !== "autorizado") recargar();
   }
 
+  // Mientras se factura, los enlaces de la página se deshabilitan: irse a mitad
+  // de la emisión dejaría el resultado sin que nadie lo vea.
+  const ocupado = emitiendoId !== null;
   const colSpan = 6;
 
   return (
@@ -123,20 +126,37 @@ export default function VentasPage() {
       <main className="flex flex-1 w-full flex-col px-6 py-10 sm:px-10">
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <Link
-              href="/"
-              className="mb-2 inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-foreground dark:text-zinc-400"
-            >
-              <ArrowLeftIcon className="size-3.5" />
-              Catálogo
-            </Link>
+            {ocupado ? (
+              <span
+                aria-disabled="true"
+                className="mb-2 inline-flex items-center gap-1 text-sm text-zinc-400 dark:text-zinc-600"
+              >
+                <ArrowLeftIcon className="size-3.5" />
+                Catálogo
+              </span>
+            ) : (
+              <Link
+                href="/"
+                className="mb-2 inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-foreground dark:text-zinc-400"
+              >
+                <ArrowLeftIcon className="size-3.5" />
+                Catálogo
+              </Link>
+            )}
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">Ventas</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button nativeButton={false} render={<Link href="/ventas/nueva" />}>
-              <PlusIcon />
-              Nueva venta
-            </Button>
+            {ocupado ? (
+              <Button disabled>
+                <PlusIcon />
+                Nueva venta
+              </Button>
+            ) : (
+              <Button nativeButton={false} render={<Link href="/ventas/nueva" />}>
+                <PlusIcon />
+                Nueva venta
+              </Button>
+            )}
             <ThemeToggle />
           </div>
         </header>
@@ -163,7 +183,7 @@ export default function VentasPage() {
                 if (v) void facturar(v);
                 else void emitir(resultado.ventaId).then((r) => r && r.tipo !== "autorizado" && recargar());
               }}
-              onCerrar={resultado.tipo === "autorizado" ? undefined : limpiarResultado}
+              onCerrar={resultado.tipo === "fallido" || resultado.tipo === "error" ? limpiarResultado : undefined}
             />
           </div>
         )}
@@ -263,8 +283,9 @@ export default function VentasPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            nativeButton={false}
-                            render={<Link href={`/facturacion?ventaId=${v.id}`} />}
+                            disabled={ocupado}
+                            nativeButton={ocupado}
+                            render={ocupado ? undefined : <Link href={`/facturacion?ventaId=${v.id}`} />}
                           >
                             Ver comprobantes
                           </Button>

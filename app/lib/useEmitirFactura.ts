@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ErrorApi, fetchFacturacion, jsonInit, type ComprobanteConItems } from "@/app/lib/facturacion";
 import { nuevaClave } from "@/app/lib/ventasForm";
@@ -41,6 +41,17 @@ export function useEmitirFactura() {
   const [resultado, setResultado] = useState<ResultadoEmision | null>(null);
   const enVuelo = useRef(false);
   const claves = useRef(new Map<number, string>());
+  // Si el usuario se va de la pantalla mientras la emisión está en curso, la
+  // respuesta llega a un componente desmontado: no hay que arrastrarlo al
+  // comprobante desde otra pantalla. (El comprobante igual queda emitido: se
+  // lo encuentra desde Comprobantes.)
+  const montado = useRef(true);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
 
   // Devuelve null si ya había una emisión en curso (el segundo clic se ignora;
   // el primero es quien procesa el resultado).
@@ -77,7 +88,7 @@ export function useEmitirFactura() {
         // No se libera `enVuelo` ni `emitiendoId`: la pantalla se está yendo al
         // comprobante y un clic más en "Facturar" generaría (con clave nueva)
         // una segunda factura.
-        router.push(`/facturacion/${final.comprobante.id}`);
+        if (montado.current) router.push(`/facturacion/${final.comprobante.id}`);
         return final;
       }
       enVuelo.current = false;

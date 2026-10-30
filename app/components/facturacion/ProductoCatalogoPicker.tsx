@@ -4,14 +4,10 @@ import { useEffect, useState } from "react";
 import { PackageSearchIcon } from "lucide-react";
 import { fetchFacturacion, formatearMoneda, type Paginado } from "@/app/lib/facturacion";
 import type { Producto } from "@/app/lib/productos";
-import { ALICUOTA_POR_DEFECTO, MAX_DESCRIPCION } from "@/app/lib/ventasForm";
+import { ALICUOTA_POR_DEFECTO, MAX_DESCRIPCION, type OrigenPrecio } from "@/app/lib/ventasForm";
 import { Button } from "@/components/ui/button";
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-// Qué precio del catálogo se usó para precargar: se le dice al usuario porque
-// "con IVA" cambia cómo hay que interpretar el precio de la venta.
-export type OrigenPrecio = "neto" | "conIva" | "ninguno";
 
 export type ProductoElegido = {
   descripcion: string;

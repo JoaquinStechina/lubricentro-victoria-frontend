@@ -61,6 +61,9 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
   const { emitir, emitiendoId, resultado, limpiarResultado } = useEmitirFactura();
 
   const bloqueado = ventaGuardada !== null;
+  // Mientras se guarda o se factura, irse de la pantalla dejaría la operación
+  // sin que nadie vea el resultado: los enlaces de la página se deshabilitan.
+  const ocupado = guardando || emitiendoId !== null;
 
   // ---- Vista previa (única fuente de totales: el backend) -----------------
   const itemsPreview = useMemo(() => itemsParaPrevisualizar(items), [items]);
@@ -184,13 +187,23 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
       <main className="flex flex-1 w-full flex-col px-6 py-10 sm:px-10">
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <Link
-              href="/ventas"
-              className="mb-2 inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-foreground dark:text-zinc-400"
-            >
-              <ArrowLeftIcon className="size-3.5" />
-              Ventas
-            </Link>
+            {ocupado ? (
+              <span
+                aria-disabled="true"
+                className="mb-2 inline-flex items-center gap-1 text-sm text-zinc-400 dark:text-zinc-600"
+              >
+                <ArrowLeftIcon className="size-3.5" />
+                Ventas
+              </span>
+            ) : (
+              <Link
+                href="/ventas"
+                className="mb-2 inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-foreground dark:text-zinc-400"
+              >
+                <ArrowLeftIcon className="size-3.5" />
+                Ventas
+              </Link>
+            )}
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">Nueva venta</h1>
           </div>
           <ThemeToggle />
@@ -209,6 +222,11 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
                 <CheckCircle2Icon className="size-4 shrink-0" />
                 Venta #{ventaGuardada.id} guardada.
               </p>
+              {resultado?.tipo === "pendiente" && (
+                <p className="mt-1">
+                  La factura quedó pendiente de confirmar con ARCA: no está sin facturar. Resolvela desde el aviso de abajo.
+                </p>
+              )}
               {!resultado && emitiendoId === null && (
                 <p className="mt-1">Todavía no está facturada: podés facturarla ahora o hacerlo después desde Ventas.</p>
               )}
@@ -227,9 +245,15 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
                     {emitiendoId !== null ? "Facturando…" : "Facturar ahora"}
                   </Button>
                 )}
-                <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
-                  Ver ventas
-                </Button>
+                {ocupado ? (
+                  <Button variant="outline" disabled>
+                    Ver ventas
+                  </Button>
+                ) : (
+                  <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
+                    Ver ventas
+                  </Button>
+                )}
                 <Button variant="outline" onClick={onOtraVenta} disabled={emitiendoId !== null}>
                   <PlusIcon />
                   Cargar otra venta
@@ -241,7 +265,9 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
                 resultado={resultado}
                 reintentando={emitiendoId !== null}
                 onReintentar={() => void emitir(ventaGuardada.id)}
-                onCerrar={resultado.tipo === "autorizado" ? undefined : limpiarResultado}
+                // Un pendiente o un autorizado no se descartan: la venta ya NO está "sin
+                // facturar" y el único camino es abrir el comprobante.
+                onCerrar={resultado.tipo === "fallido" || resultado.tipo === "error" ? limpiarResultado : undefined}
               />
             )}
           </section>

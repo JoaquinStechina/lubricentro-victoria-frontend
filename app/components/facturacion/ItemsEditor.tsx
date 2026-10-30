@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { InfoIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, TriangleAlertIcon, Trash2Icon } from "lucide-react";
 import ProductoCatalogoPicker, { type ProductoElegido } from "@/app/components/facturacion/ProductoCatalogoPicker";
 import { formatearMoneda } from "@/app/lib/facturacion";
 import {
@@ -15,6 +14,7 @@ import {
   numeroATexto,
   type ItemFormulario,
 } from "@/app/lib/ventasForm";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,43 +23,20 @@ const ITEMS_ALICUOTA = Object.fromEntries(ALICUOTAS_IVA.map((a) => [String(a), e
 
 const GRID = "lg:grid-cols-[minmax(0,1fr)_6.5rem_9rem_7rem_8rem_2rem]";
 
-// Qué se precargó desde el catálogo y qué tiene que revisar el usuario. Se
-// guarda estructurado (no como frase) para que el texto siga la tilde de
-// "los precios incluyen IVA" si el usuario la cambia después de elegir.
-type AvisoPrecarga = {
-  clave: string;
-  descripcion: string;
-  producto: ProductoElegido;
-  alicuotaOriginal: number;
-};
+// Solo formato: el número que el usuario tipeó, tal como se leyó. Sirve para
+// que "12.500" o "1234,5" no queden librados a la interpretación del lector.
+const formatoCantidad = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
 
-function textoAviso(a: AvisoPrecarga, preciosIncluyenIva: boolean): string[] {
-  const { producto } = a;
-  const frases: string[] = [];
-  if (producto.origenPrecio === "neto" && producto.precioUnitario !== null) {
-    frases.push(`Se precargó el precio neto (sin IVA): ${formatearMoneda(producto.precioUnitario)}.`);
-    if (preciosIncluyenIva) {
-      frases.push("La venta tiene tildado «Los precios incluyen IVA»: destildalo, o este neto se tomará como precio final.");
-    }
-  } else if (producto.origenPrecio === "conIva" && producto.precioUnitario !== null) {
-    frases.push(
-      `El catálogo no tiene precio neto: se precargó el precio con IVA (${formatearMoneda(producto.precioUnitario)}).`,
-    );
-    if (!preciosIncluyenIva) {
-      frases.push("Tildá «Los precios incluyen IVA» para que se interprete bien.");
-    }
-  } else {
-    frases.push("Este producto no tiene precio en el catálogo: completalo a mano.");
+// Advertencia cuando la tilde de "los precios incluyen IVA" contradice de dónde
+// salió el precio precargado de la fila (neto sin IVA vs. precio con IVA).
+function advertenciaIva(origen: ItemFormulario["origenPrecio"], preciosIncluyenIva: boolean): string | null {
+  if (origen === "neto" && preciosIncluyenIva) {
+    return "Este precio es neto (sin IVA) pero la venta tiene tildado «Los precios incluyen IVA»: se tomaría como precio final.";
   }
-  if (producto.moneda && producto.moneda !== "ARS") {
-    frases.push(`Ojo: en el catálogo está en ${producto.moneda}, no en pesos.`);
+  if (origen === "conIva" && !preciosIncluyenIva) {
+    return "Este precio ya incluye IVA pero la venta no tiene tildado «Los precios incluyen IVA»: se le sumaría IVA encima.";
   }
-  if (!ALICUOTAS_IVA.some((v) => v === a.alicuotaOriginal)) {
-    frases.push(
-      `La alícuota del catálogo (${etiquetaAlicuota(a.alicuotaOriginal)}) no está soportada para facturar: se puso 21 %, revisala.`,
-    );
-  }
-  return frases;
+  return null;
 }
 
 // Filas de la venta. Cada fila tiene una `clave` propia (no el índice) como
@@ -80,11 +57,13 @@ export default function ItemsEditor({
   importes?: number[] | null;
   disabled?: boolean;
 }) {
-  const [aviso, setAviso] = useState<AvisoPrecarga | null>(null);
   const lleno = items.length >= MAX_ITEMS_VENTA;
 
   function cambiar(clave: string, cambios: Partial<ItemFormulario>) {
-    onChange(items.map((i) => (i.clave === clave ? { ...i, ...cambios } : i)));
+    // Si el usuario toca el precio, el origen del catálogo deja de describirlo.
+    const extra: Partial<ItemFormulario> =
+      cambios.precioUnitario !== undefined ? { origenPrecio: null, avisosCatalogo: [] } : {};
+    onChange(items.map((i) => (i.clave === clave ? { ...i, ...cambios, ...extra } : i)));
   }
 
   function agregarVacio() {
@@ -95,19 +74,28 @@ export default function ItemsEditor({
   function agregarDeCatalogo(p: ProductoElegido) {
     if (lleno) return;
     const alicuotaValida = ALICUOTAS_IVA.some((v) => v === p.alicuotaIva);
-    const item: ItemFormulario = {
-      clave: nuevaClave(),
-      descripcion: p.descripcion,
-      cantidad: "1",
-      precioUnitario: p.precioUnitario === null ? "" : numeroATexto(p.precioUnitario),
-      alicuotaIva: String(alicuotaValida ? p.alicuotaIva : 21),
-      productoPrecioId: p.productoPrecioId,
-    };
-    onChange([...items, item]);
-    setAviso({ clave: item.clave, descripcion: item.descripcion, producto: p, alicuotaOriginal: p.alicuotaIva });
+    const avisos: string[] = [];
+    if (p.origenPrecio === "ninguno") avisos.push("Este producto no tiene precio en el catálogo: completalo a mano.");
+    if (p.moneda && p.moneda !== "ARS") avisos.push(`Ojo: en el catálogo está en ${p.moneda}, no en pesos.`);
+    if (!alicuotaValida) {
+      avisos.push(
+        `La alícuota del catálogo (${etiquetaAlicuota(p.alicuotaIva)}) no está soportada para facturar: se puso 21 %, revisala.`,
+      );
+    }
+    onChange([
+      ...items,
+      {
+        clave: nuevaClave(),
+        descripcion: p.descripcion,
+        cantidad: "1",
+        precioUnitario: p.precioUnitario === null ? "" : numeroATexto(p.precioUnitario),
+        alicuotaIva: String(alicuotaValida ? p.alicuotaIva : 21),
+        productoPrecioId: p.productoPrecioId,
+        origenPrecio: p.origenPrecio,
+        avisosCatalogo: avisos,
+      },
+    ]);
   }
-
-  const avisoVisible = aviso && items.some((i) => i.clave === aviso.clave) ? aviso : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -127,25 +115,6 @@ export default function ItemsEditor({
         <p role="status" className="text-xs text-zinc-600 dark:text-zinc-400">
           Llegaste al máximo de {MAX_ITEMS_VENTA} ítems por venta.
         </p>
-      )}
-
-      {avisoVisible && (
-        <div
-          role="status"
-          className="flex items-start gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200"
-        >
-          <InfoIcon className="mt-0.5 size-4 shrink-0" />
-          <div className="flex-1">
-            <p className="font-medium">«{avisoVisible.descripcion || "Producto"}» precargado desde el catálogo</p>
-            {textoAviso(avisoVisible, preciosIncluyenIva).map((f) => (
-              <p key={f}>{f}</p>
-            ))}
-            <p>Podés editar todo.</p>
-          </div>
-          <Button type="button" variant="ghost" size="xs" onClick={() => setAviso(null)}>
-            Entendido
-          </Button>
-        </div>
       )}
 
       {items.length === 0 ? (
@@ -208,6 +177,11 @@ export default function ItemsEditor({
                       className="text-right"
                       disabled={disabled}
                     />
+                    {e.cantidad !== null && (
+                      <p className="mt-0.5 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                        = {formatoCantidad.format(e.cantidad)}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 lg:hidden dark:text-zinc-400">
@@ -226,6 +200,11 @@ export default function ItemsEditor({
                       className="text-right"
                       disabled={disabled}
                     />
+                    {e.precioUnitario !== null && (
+                      <p className="mt-0.5 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                        = {formatearMoneda(e.precioUnitario)}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 lg:hidden dark:text-zinc-400">
@@ -273,6 +252,26 @@ export default function ItemsEditor({
                     </Button>
                   </div>
                 </div>
+                {(item.origenPrecio || item.avisosCatalogo.length > 0) && (
+                  <div className="mt-1.5 flex flex-col gap-0.5 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                      {item.origenPrecio === "neto" && <Badge variant="outline">Precio neto del catálogo</Badge>}
+                      {item.origenPrecio === "conIva" && <Badge variant="outline">Precio con IVA del catálogo</Badge>}
+                      {item.avisosCatalogo.map((a) => (
+                        <span key={a}>{a}</span>
+                      ))}
+                    </div>
+                    {advertenciaIva(item.origenPrecio, preciosIncluyenIva) && (
+                      <p
+                        role="status"
+                        className="flex items-start gap-1 text-amber-800 dark:text-amber-300"
+                      >
+                        <TriangleAlertIcon className="mt-0.5 size-3 shrink-0" />
+                        {advertenciaIva(item.origenPrecio, preciosIncluyenIva)}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {(e.errorCantidad || e.errorPrecio) && (
                   <div className="mt-1 flex flex-col gap-0.5 text-xs text-destructive">
                     {e.errorCantidad && (

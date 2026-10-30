@@ -111,10 +111,15 @@ export default function ResultadoEmisionPanel({
   }
 
   const { error } = resultado;
-  // Sin respuesta del servidor (red caída, timeout) o error de servidor: no se
-  // sabe si la factura se emitió. Reintentar es seguro porque reusa la misma
-  // clave de idempotencia: si ya se emitió, devuelve ese comprobante.
-  const incierto = error.status === 0 || error.status >= 500;
+  // Sin respuesta del servidor (red caída, timeout), error de servidor o un 2xx
+  // cuyo cuerpo no se pudo leer: no se sabe si la factura se emitió. Reintentar
+  // es seguro porque reusa la misma clave de idempotencia: si ya se emitió,
+  // devuelve ese comprobante.
+  const incierto = error.status === 0 || error.status >= 500 || (error.status >= 200 && error.status < 300);
+  // 409: el backend rechazó el pedido por el estado actual de la venta o de la
+  // numeración; repetirlo tal cual no cambia el resultado. Se manda a mirar los
+  // comprobantes de la venta.
+  const conflicto = error.status === 409;
   return (
     <div role="alert" className={`${CAJA} ${ROJO}`}>
       <p className="flex items-center gap-2 text-base font-semibold">
@@ -133,12 +138,20 @@ export default function ResultadoEmisionPanel({
         La venta #{resultado.ventaId} quedó guardada.{" "}
         {incierto
           ? "Reintentar es seguro: se repite la misma operación y, si la factura ya se había emitido, no se duplica."
-          : "Corregí el problema y reintentá."}
+          : conflicto
+            ? "Mirá sus comprobantes. Si el mensaje pide esperar unos minutos, cerrá este aviso y volvé a facturar más tarde."
+            : "Corregí el problema y reintentá."}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button onClick={onReintentar} disabled={reintentando}>
-          {reintentando ? "Facturando…" : "Reintentar facturación"}
-        </Button>
+        {conflicto ? (
+          <Button nativeButton={false} render={<Link href={`/facturacion?ventaId=${resultado.ventaId}`} />}>
+            Ver comprobantes
+          </Button>
+        ) : (
+          <Button onClick={onReintentar} disabled={reintentando}>
+            {reintentando ? "Facturando…" : "Reintentar facturación"}
+          </Button>
+        )}
         <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
           Ver ventas
         </Button>
