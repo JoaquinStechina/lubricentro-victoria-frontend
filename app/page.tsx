@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { PackageIcon, UploadCloudIcon } from "lucide-react";
+import { PackageIcon, ReceiptIcon, UploadCloudIcon } from "lucide-react";
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -34,6 +34,12 @@ export default function Home() {
               <Button variant="outline">
                 <PackageIcon />
                 Stock
+              </Button>
+            </Link>
+            <Link href="/facturacion">
+              <Button variant="outline">
+                <ReceiptIcon />
+                Facturación
               </Button>
             </Link>
             <ThemeToggle />
