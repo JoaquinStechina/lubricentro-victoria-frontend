@@ -256,8 +256,12 @@ export type Previsualizacion = {
 
 const formatoMoneda = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
 
+// Un valor no numérico (NaN/Infinity) se muestra como "—": nunca "NaN" en
+// pantalla. Un importe que redondea a cero (incluido -0) se muestra sin signo:
+// Intl formatea -0 como "-$ 0,00", que en una factura confunde.
 export function formatearMoneda(n: number): string {
-  return formatoMoneda.format(n);
+  if (!Number.isFinite(n)) return "—";
+  return formatoMoneda.format(Math.round(n * 100) === 0 ? 0 : n);
 }
 
 // "0001-00000012"; "—" mientras el comprobante no tiene número.
@@ -335,11 +339,15 @@ export class ErrorApi extends Error {
   }
 }
 
-export type RespuestaApi<T> = { ok: true; status: number; data: T };
+// Marca interna para distinguir "el cuerpo no era JSON" de un `null` legítimo
+// (GET /config devuelve null si nunca se guardó).
+const INVALIDO = Symbol("cuerpo-no-json");
 
-// fetch hacia el backend que devuelve `{ ok, status, data }` en cualquier 2xx
-// (así se distingue 201 de 202 y 200) y lanza `ErrorApi` en el resto. No
-// reemplaza a apiFetch: ese sigue siendo el cliente del resto de la app.
+export type RespuestaApi<T> = { status: number; data: T };
+
+// fetch hacia el backend que devuelve `{ status, data }` en cualquier 2xx (así
+// se distingue 201 de 202 y 200) y lanza `ErrorApi` en el resto. No reemplaza a
+// apiFetch: ese sigue siendo el cliente del resto de la app.
 export async function fetchFacturacion<T>(path: string, init?: RequestInit): Promise<RespuestaApi<T>> {
   let res: Response;
   try {
@@ -347,21 +355,35 @@ export async function fetchFacturacion<T>(path: string, init?: RequestInit): Pro
   } catch {
     throw new ErrorApi(0, "No se pudo conectar con el servidor. Revisá tu conexión e intentá de nuevo.");
   }
-  const cuerpo: unknown = await res.json().catch(() => null);
+  // 204 no tiene cuerpo: es un éxito con `data: null`, no un JSON inválido.
+  if (res.status === 204) return { status: 204, data: null as T };
+  const cuerpo: unknown = await res.json().catch(() => INVALIDO);
   if (!res.ok) {
-    const c = (cuerpo && typeof cuerpo === "object" ? cuerpo : {}) as {
+    const c = (cuerpo && cuerpo !== INVALIDO && typeof cuerpo === "object" ? cuerpo : {}) as {
       error?: unknown;
       detalles?: unknown;
       idEliminado?: unknown;
     };
     throw new ErrorApi(
       res.status,
-      typeof c.error === "string" && c.error ? c.error : `Error ${res.status} en ${path}`,
+      // Sin `error` en el cuerpo (p. ej. un 502 de un proxy con HTML) no se
+      // muestra el detalle técnico de la ruta: un mensaje genérico en español.
+      typeof c.error === "string" && c.error
+        ? c.error
+        : `El servidor no respondió como se esperaba (código ${res.status}). Probá de nuevo en unos minutos.`,
       Array.isArray(c.detalles) ? c.detalles.filter((d): d is string => typeof d === "string") : [],
       typeof c.idEliminado === "number" ? c.idEliminado : null,
     );
   }
-  return { ok: true, status: res.status, data: cuerpo as T };
+  // Un 2xx con cuerpo que no es JSON no se puede usar como `T`: se trata como
+  // falla en vez de devolver `null` disfrazado de dato.
+  if (cuerpo === INVALIDO) {
+    throw new ErrorApi(
+      res.status,
+      `El servidor respondió con un formato inesperado (código ${res.status}). Probá de nuevo en unos minutos.`,
+    );
+  }
+  return { status: res.status, data: cuerpo as T };
 }
 
 // apiJsonInit (api.ts) solo cubre POST y PATCH; la config fiscal se guarda con PUT.
