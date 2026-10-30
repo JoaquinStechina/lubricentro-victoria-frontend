@@ -49,7 +49,7 @@ function clasificar(status: number, comprobante: ComprobanteConItems): Resultado
   return { tipo: "fallido", comprobante };
 }
 
-const CAJA = "rounded-lg border px-4 py-3 text-sm";
+const CAJA = "rounded-lg border px-4 py-3 text-sm break-words";
 const ROJO = "border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200";
 const AMBAR =
   "border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100";
@@ -204,6 +204,12 @@ function NotaForm({
 
   const notasPrevias = original.notas;
   const bloqueado = enviando;
+  // Con una nota pendiente de confirmar no se emite otra: no se sabe si la
+  // primera quedó autorizada y una segunda (con clave nueva) podría duplicar
+  // la anulación o el cobro. Se deriva del detalle (que el padre refresca vía
+  // onEmitida) y no solo del resultado de este diálogo, para que también valga
+  // si se cerró y se reabrió o si la nota pendiente viene de antes.
+  const hayNotaPendiente = notasPrevias.some((n) => n.estado === "pendiente") || resultado?.tipo === "pendiente";
 
   return (
     <>
@@ -218,7 +224,7 @@ function NotaForm({
 
       {notasPrevias.length > 0 && (
         <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950/40">
-          <p className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Notas ya emitidas sobre este comprobante</p>
+          <p className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">Notas asociadas a este comprobante</p>
           <ul className="flex flex-col gap-1">
             {notasPrevias.map((n) => (
               <li key={n.id} className="flex flex-wrap items-center gap-2 text-zinc-700 dark:text-zinc-300">
@@ -299,6 +305,13 @@ function NotaForm({
           : "El sistema calcula los importes de la nota; si algo no es válido, el motivo aparece acá."}
       </p>
 
+      {hayNotaPendiente && resultado?.tipo !== "pendiente" && (
+        <p role="status" className={`${CAJA} ${AMBAR}`}>
+          Hay una nota pendiente de confirmar con ARCA sobre este comprobante. Reconciliala desde su detalle antes de
+          emitir otra.
+        </p>
+      )}
+
       {resultado && <ResultadoNotaPanel resultado={resultado} />}
 
       <DialogFooter>
@@ -308,10 +321,7 @@ function NotaForm({
         <Button
           variant={esCredito ? "destructive" : "default"}
           onClick={() => void emitir()}
-          // Con la nota pendiente no se emite otra: no se sabe si la primera
-          // quedó autorizada y una segunda (con clave nueva) podría duplicar
-          // la anulación. Hay que reconciliar primero.
-          disabled={!puedeEmitir || bloqueado || resultado?.tipo === "pendiente"}
+          disabled={!puedeEmitir || bloqueado || hayNotaPendiente}
         >
           {bloqueado
             ? "Emitiendo…"
@@ -380,8 +390,11 @@ function ResultadoNotaPanel({ resultado }: { resultado: ResultadoNota }) {
   if (resultado.tipo === "error") {
     const { error } = resultado;
     // Sin respuesta, error de servidor o 2xx ilegible: no se sabe si la nota
-    // se emitió. Reintentar es seguro: se reusa la misma clave.
-    const incierto = error.status === 0 || error.status >= 500 || (error.status >= 200 && error.status < 300);
+    // se emitió. Reintentar es seguro: se reusa la misma clave. El 503 (ARCA
+    // sin configurar) es la excepción: el backend lo responde ANTES de tocar
+    // nada, así que es un fracaso definitivo y no una duda.
+    const incierto =
+      error.status === 0 || (error.status >= 500 && error.status !== 503) || (error.status >= 200 && error.status < 300);
     return (
       <div role="alert" className={`${CAJA} ${ROJO}`}>
         <p className="flex items-center gap-2 text-base font-semibold">
@@ -396,11 +409,11 @@ function ResultadoNotaPanel({ resultado }: { resultado: ResultadoNota }) {
             ))}
           </ul>
         )}
-        {incierto && (
-          <p className="mt-2">
-            Reintentar es seguro: se repite la misma operación y, si la nota ya se había emitido, no se duplica.
-          </p>
-        )}
+        <p className="mt-2">
+          {incierto
+            ? "Reintentar es seguro: se repite la misma operación y, si la nota ya se había emitido, no se duplica."
+            : "No se emitió ninguna nota: el comprobante original no cambió."}
+        </p>
       </div>
     );
   }

@@ -62,17 +62,25 @@ export default function ComprobantesPage() {
   );
 }
 
+// Tope de un id en el backend (columna INT de 32 bits): un valor mayor no puede
+// existir y mandarlo daría un 400.
+const MAX_ID = 2147483647;
+
+type VentaIdUrl = { ventaId: string; invalido: boolean };
+
 // ?ventaId=N: el listado de ventas enlaza acá para ver los comprobantes de una
-// venta. Solo se acepta un entero positivo; cualquier otra cosa se ignora en
-// vez de mandarle basura al backend.
-function leerVentaId(valor: string | null): string {
-  return valor !== null && /^[1-9]\d{0,9}$/.test(valor) ? valor : "";
+// venta. Solo se acepta un entero positivo dentro del tope; cualquier otra cosa
+// no se envía al backend y se avisa en pantalla (sin filtrar por nada).
+function leerVentaId(valor: string | null): VentaIdUrl {
+  if (valor === null) return { ventaId: "", invalido: false };
+  if (/^[1-9]\d{0,9}$/.test(valor) && Number(valor) <= MAX_ID) return { ventaId: valor, invalido: false };
+  return { ventaId: "", invalido: true };
 }
 
 function ComprobantesView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const ventaId = leerVentaId(searchParams.get("ventaId"));
+  const { ventaId, invalido: ventaIdInvalido } = leerVentaId(searchParams.get("ventaId"));
 
   const tabla = useTablaRecurso({ filtrosIniciales: FILTROS_INICIALES, pageSizeInicial: PAGE_SIZES[0] });
   const { buildParams, fetchKey: fetchKeyTabla, recargar } = tabla;
@@ -206,6 +214,16 @@ function ComprobantesView() {
               </Button>
             )}
           </div>
+          {ventaIdInvalido && (
+            <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-amber-900 dark:text-amber-200">
+              <span>
+                El filtro de venta de la dirección no es válido y se ignoró: se muestran todos los comprobantes.
+              </span>
+              <Button variant="outline" size="sm" onClick={() => router.replace("/facturacion")}>
+                Quitar filtro inválido
+              </Button>
+            </div>
+          )}
           {ventaId && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-zinc-600 dark:text-zinc-400">Filtrando por:</span>
@@ -311,7 +329,7 @@ function ComprobantesView() {
                         {formatearNroComprobante(c.ptoVta, c.nro)}
                       </TableCell>
                       <TableCell className="whitespace-normal">
-                        <div className="font-medium text-zinc-900 dark:text-zinc-100">{c.receptorNombre}</div>
+                        <div className="min-w-0 break-words font-medium text-zinc-900 dark:text-zinc-100">{c.receptorNombre}</div>
                         <div className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
                           {c.receptorDocTipo === 99
                             ? "Sin identificar"

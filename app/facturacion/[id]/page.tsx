@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const CAJA = "rounded-lg border px-4 py-3 text-sm";
+const CAJA = "rounded-lg border px-4 py-3 text-sm break-words";
 const ROJO = "border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200";
 const AMBAR =
   "border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100";
@@ -40,6 +40,24 @@ const CELESTE = "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:
 const TARJETA = "rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900";
 
 const formatoCantidad = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
+
+// El snapshot de items/iva es JSON guardado: si alguna fila trae algo que no
+// es lo esperado se muestra "—" en vez de "NaN" o "undefined %".
+function esNumero(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+function cantidadTxt(v: unknown): string {
+  return esNumero(v) ? formatoCantidad.format(v) : "—";
+}
+function alicuotaTxt(v: unknown): string {
+  return esNumero(v) ? etiquetaAlicuota(v) : "—";
+}
+function monedaTxt(v: unknown): string {
+  return esNumero(v) ? formatearMoneda(v) : "—";
+}
+function esObjeto(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
 
 // Respuesta etiquetada con la consulta que la originó: "cargando" se deriva
 // (clave vigente !== clave de la respuesta) y una respuesta vieja nunca pisa a
@@ -84,13 +102,16 @@ export default function ComprobanteDetallePage() {
 
   // Vuelve a pedir el detalle sin pasar por "cargando": se usa tras una nota
   // nueva o un 409 al reconciliar, donde la pantalla tiene que seguir en pie.
-  async function refrescar() {
+  // Devuelve el detalle recién traído o null si no se pudo: quien llama NO debe
+  // dar por actualizado lo que sigue en pantalla cuando recibe null.
+  async function refrescar(): Promise<ComprobanteDetalle | null> {
     const claveAlPedir = clave;
     try {
       const res = await fetchFacturacion<ComprobanteDetalle>(`/api/facturacion/comprobantes/${encodeURIComponent(id)}`);
       if (claveVigente.current === claveAlPedir) setCarga({ clave: claveAlPedir, data: res.data, error: null });
+      return res.data;
     } catch {
-      // Si falla el refresco se queda lo que ya se estaba mostrando.
+      return null;
     }
   }
 
@@ -136,7 +157,9 @@ export default function ComprobanteDetallePage() {
             Cargando el comprobante…
           </p>
         )}
-        {!cargando && carga?.error && carga.error.status === 404 && (
+        {/* 404 (no existe) y 400 (id que no es un número, p. ej. /facturacion/abc)
+            son lo mismo para el usuario: ese comprobante no existe. */}
+        {!cargando && carga?.error && (carga.error.status === 404 || carga.error.status === 400) && (
           <div className="flex flex-col items-start gap-3">
             <p role="alert" className="text-sm text-zinc-800 dark:text-zinc-200">
               No encontramos este comprobante. Puede que el enlace sea viejo o que el número esté mal.
@@ -146,7 +169,7 @@ export default function ComprobanteDetallePage() {
             </Button>
           </div>
         )}
-        {!cargando && carga?.error && carga.error.status !== 404 && (
+        {!cargando && carga?.error && carga.error.status !== 404 && carga.error.status !== 400 && (
           <div className="flex flex-col items-start gap-3">
             <p role="alert" className="text-sm text-red-700 dark:text-red-400">
               {carga.error.error}
@@ -175,12 +198,14 @@ function Detalle({
 }: {
   comprobante: ComprobanteDetalle;
   actualizar: (c: ComprobanteConItems) => void;
-  refrescar: () => Promise<void>;
+  refrescar: () => Promise<ComprobanteDetalle | null>;
 }) {
   const [reconciliando, setReconciliando] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const enVuelo = useRef(false);
 
+  const itemsValidos: Record<string, unknown>[] = Array.isArray(c.items) ? c.items.filter(esObjeto) : [];
+  const ivaValido: Record<string, unknown>[] = Array.isArray(c.iva) ? c.iva.filter(esObjeto) : [];
   const pendiente = c.estado === "pendiente";
   const fallido = c.estado === "rechazado" || c.estado === "error";
   const prueba = esAmbienteDePrueba(c.ambiente);
@@ -209,14 +234,29 @@ function Detalle({
       );
     } catch (err) {
       if (err instanceof ErrorApi && err.status === 409) {
-        // 409 = ya no está pendiente (se resolvió solo, por otra emisión o
-        // desde otra pestaña): no es una falla, se refresca el estado.
-        await refrescar();
-        setAviso({
-          tipo: "info",
-          texto: "Este comprobante ya no estaba pendiente. Se actualizó con su estado actual.",
-          detalles: [],
-        });
+        // El backend responde 409 en dos casos distintos: (a) el comprobante ya
+        // no está pendiente (se resolvió solo, por otra emisión o desde otra
+        // pestaña), y (b) es de OTRO ambiente que el del servicio, y entonces
+        // sigue pendiente y sin cambios. El status no los distingue: se vuelve
+        // a pedir el comprobante y se decide por su estado real.
+        const actual = await refrescar();
+        if (actual === null) {
+          setAviso({
+            tipo: "error",
+            texto: "No pudimos actualizar el comprobante; recargá la página para ver su estado actual.",
+            detalles: [],
+          });
+        } else if (actual.estado === "pendiente") {
+          // Sigue pendiente: no es un "ya se resolvió". Se muestra el motivo
+          // del backend, informativo (no es una falla de esta pantalla).
+          setAviso({ tipo: "info", texto: err.error, detalles: err.detalles });
+        } else {
+          setAviso({
+            tipo: "info",
+            texto: "Este comprobante ya no estaba pendiente. Se actualizó con su estado actual.",
+            detalles: [],
+          });
+        }
       } else {
         const e = err instanceof ErrorApi ? err : new ErrorApi(0, "No se pudo reconciliar el comprobante.");
         setAviso({ tipo: "error", texto: e.error, detalles: e.detalles });
@@ -277,7 +317,7 @@ function Detalle({
           <p className="mt-2">
             No tiene validez: no se autorizó ni consume un número.{" "}
             {c.comprobanteAsociadoId === null
-              ? `La venta #${c.venta.id} puede volver a facturarse.`
+              ? `Este intento no bloquea facturar la venta #${c.venta.id}.`
               : "El comprobante original no cambió: se puede intentar la nota de nuevo."}
           </p>
         </div>
@@ -366,15 +406,17 @@ function Detalle({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Array.isArray(c.items) && c.items.length > 0 ? (
-              c.items.map((it, i) => (
+            {itemsValidos.length > 0 ? (
+              itemsValidos.map((it, i) => (
                 <TableRow key={i}>
-                  <TableCell className="whitespace-normal text-zinc-900 dark:text-zinc-100">{it.descripcion}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatoCantidad.format(it.cantidad)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatearMoneda(it.precioUnitario)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{etiquetaAlicuota(it.alicuotaIva)}</TableCell>
+                  <TableCell className="min-w-0 whitespace-normal break-words text-zinc-900 dark:text-zinc-100">
+                    {typeof it.descripcion === "string" && it.descripcion ? it.descripcion : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{cantidadTxt(it.cantidad)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{monedaTxt(it.precioUnitario)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{alicuotaTxt(it.alicuotaIva)}</TableCell>
                   <TableCell className="text-right tabular-nums font-medium text-zinc-900 dark:text-zinc-100">
-                    {formatearMoneda(it.total)}
+                    {monedaTxt(it.total)}
                   </TableCell>
                 </TableRow>
               ))
@@ -393,15 +435,14 @@ function Detalle({
         <h2 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">Totales</h2>
         <dl className="flex flex-col gap-1.5 text-sm tabular-nums">
           <Fila etiqueta="Neto">{formatearMoneda(c.impNeto)}</Fila>
-          {Array.isArray(c.iva) &&
-            c.iva.map((a, i) => (
-              <Fila
-                key={`${a.id}-${i}`}
-                etiqueta={`IVA ${etiquetaAlicuota(a.porcentaje)} (sobre ${formatearMoneda(a.baseImp)})`}
-              >
-                {formatearMoneda(a.importe)}
-              </Fila>
-            ))}
+          {ivaValido.map((a, i) => (
+            <Fila
+              key={i}
+              etiqueta={`IVA ${alicuotaTxt(a.porcentaje)} (sobre ${monedaTxt(a.baseImp)})`}
+            >
+              {monedaTxt(a.importe)}
+            </Fila>
+          ))}
           <Fila etiqueta="Total IVA">{formatearMoneda(c.impIva)}</Fila>
           <div className="mt-1 flex items-baseline justify-between border-t border-zinc-200 pt-2 text-base font-semibold text-zinc-900 dark:border-zinc-800 dark:text-zinc-50">
             <dt>Total</dt>
