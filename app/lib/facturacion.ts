@@ -329,6 +329,42 @@ export function condicionIvaPorId(id: number) {
   return CONDICIONES_IVA.find((c) => c.id === id);
 }
 
+const ESTADOS_FACTURA: Record<EstadoFactura, string> = {
+  sin_facturar: "Sin facturar",
+  pendiente: "Pendiente de ARCA",
+  facturada: "Facturada",
+  con_notas: "Facturada con notas",
+};
+
+export function etiquetaEstadoFactura(estado: EstadoFactura): string {
+  return ESTADOS_FACTURA[estado] ?? estado;
+}
+
+// "2026-10-30" -> "30/10/2026". Se parte el texto a mano: pasar por Date
+// correría el día según la zona horaria del navegador.
+export function formatearFechaIso(fecha: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : fecha;
+}
+
+// Las observaciones de ARCA llegan como JSON sin forma garantizada
+// (normalmente [{codigo, mensaje}]). Se convierten a frases para mostrar y
+// lo que no se entiende se ignora en vez de romper la pantalla.
+export function textoObservaciones(observaciones: unknown): string[] {
+  if (!Array.isArray(observaciones)) return [];
+  const frases: string[] = [];
+  for (const o of observaciones) {
+    if (typeof o === "string" && o) frases.push(o);
+    else if (o && typeof o === "object") {
+      const { codigo, mensaje } = o as { codigo?: unknown; mensaje?: unknown };
+      if (typeof mensaje === "string" && mensaje) {
+        frases.push(codigo !== undefined && codigo !== null ? `${String(codigo)}: ${mensaje}` : mensaje);
+      }
+    }
+  }
+  return frases;
+}
+
 const AMBIENTES: Record<Ambiente, string> = {
   simulado: "SIMULADO",
   homologacion: "HOMOLOGACIÓN",
