@@ -274,6 +274,21 @@ export function etiquetaTipo(tipo: number): string {
   return TIPOS[tipo] ?? `Comprobante ${tipo}`;
 }
 
+// Los seis códigos que emite el sistema, en el orden del filtro del listado.
+export const TIPOS_COMPROBANTE: number[] = [1, 6, 2, 7, 3, 8];
+
+// Solo un comprobante autorizado que sea factura (1, 6) o nota de débito
+// (2, 7) admite notas encima; una nota de crédito (3, 8) no se anula ni se
+// corrige con otra nota. El backend vuelve a validarlo.
+export function admiteNotas(tipo: number, estado: string): boolean {
+  return estado === "autorizado" && (tipo === 1 || tipo === 2 || tipo === 6 || tipo === 7);
+}
+
+// Todo ambiente que no sea producción emite comprobantes sin validez fiscal.
+export function esAmbienteDePrueba(ambiente: string): boolean {
+  return ambiente !== "produccion";
+}
+
 const ESTADOS: Record<EstadoComprobante, string> = {
   borrador: "Borrador",
   pendiente: "Pendiente",
