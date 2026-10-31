@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangleIcon, ArrowLeftIcon, DownloadIcon, Loader2Icon, RefreshCwIcon, XCircleIcon } from "lucide-react";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
+import { AMBAR, CAJA, CELESTE, ROJO, TARJETA } from "@/app/components/facturacion/estilos";
 import NotaDialog from "@/app/components/facturacion/NotaDialog";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import { API_URL } from "@/app/lib/api";
@@ -31,13 +32,6 @@ import { etiquetaAlicuota } from "@/app/lib/ventasForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-const CAJA = "rounded-lg border px-4 py-3 text-sm break-words";
-const ROJO = "border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200";
-const AMBAR =
-  "border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100";
-const CELESTE = "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200";
-const TARJETA = "rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900";
 
 const formatoCantidad = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
 
@@ -346,8 +340,18 @@ function Detalle({
           )}
           {admiteNotas(c.tipo, c.estado) && (
             <>
-              <NotaDialog original={c} naturaleza="credito" onEmitida={() => void refrescar()} />
-              <NotaDialog original={c} naturaleza="debito" onEmitida={() => void refrescar()} />
+              <NotaDialog
+                original={c}
+                naturaleza="credito"
+                onEmitida={() => void refrescar()}
+                onIncierto={() => void refrescar()}
+              />
+              <NotaDialog
+                original={c}
+                naturaleza="debito"
+                onEmitida={() => void refrescar()}
+                onIncierto={() => void refrescar()}
+              />
             </>
           )}
         </div>

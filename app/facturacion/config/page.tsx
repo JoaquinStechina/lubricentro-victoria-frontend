@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeftIcon, CheckCircle2Icon } from "lucide-react";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
@@ -116,6 +116,11 @@ function ConfigForm({ config }: { config: ConfigFiscal | null }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<ErrorForm | null>(null);
   const [exito, setExito] = useState(false);
+  // El <input type="date"> con una fecha a medio escribir (o inexistente,
+  // p. ej. 31/02) reporta value "" pero validity.badInput: mandarlo como null
+  // borraría la fecha guardada sin que el usuario lo haya pedido.
+  const fechaRef = useRef<HTMLInputElement>(null);
+  const [fechaInvalida, setFechaInvalida] = useState(false);
 
   function setCampo(campo: keyof Valores, valor: string) {
     setValores((prev) => ({ ...prev, [campo]: valor }));
@@ -126,6 +131,15 @@ function ConfigForm({ config }: { config: ConfigFiscal | null }) {
     event.preventDefault();
     setError(null);
     setExito(false);
+    if (fechaRef.current?.validity.badInput) {
+      setFechaInvalida(true);
+      setError({
+        mensaje: "La fecha de inicio de actividades no es válida: corregila o borrala por completo.",
+        detalles: [],
+      });
+      return;
+    }
+    setFechaInvalida(false);
     setGuardando(true);
     // PUT reemplaza la fila entera: se mandan todos los campos y lo opcional
     // vacío va como null (el backend lo guarda como null). Los obligatorios
@@ -222,9 +236,14 @@ function ConfigForm({ config }: { config: ConfigFiscal | null }) {
           <Label htmlFor="inicioActividades">Inicio de actividades</Label>
           <Input
             id="inicioActividades"
+            ref={fechaRef}
             type="date"
+            aria-invalid={fechaInvalida ? true : undefined}
             value={valores.inicioActividades}
-            onChange={(e) => setCampo("inicioActividades", e.target.value)}
+            onChange={(e) => {
+              setFechaInvalida(false);
+              setCampo("inicioActividades", e.target.value);
+            }}
             className="dark:scheme-dark"
           />
         </div>

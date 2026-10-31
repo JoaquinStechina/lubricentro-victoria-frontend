@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AlertTriangleIcon, FlaskConicalIcon, ShieldCheckIcon } from "lucide-react";
-import { etiquetaAmbiente, fetchFacturacion, type Ambiente, type EstadoArca } from "@/app/lib/facturacion";
+import { etiquetaAmbiente, type Ambiente } from "@/app/lib/facturacion";
+import { useEstadoArca } from "@/app/lib/useEstadoArca";
 import { cn } from "@/lib/utils";
 
 // Producción es el estado normal: tono sereno (esmeralda), nada de rojo. Los
@@ -27,27 +27,12 @@ const ESTILOS: Record<Ambiente, { clase: string; texto: string; Icono: typeof Fl
   },
 };
 
-type Carga = { estado: EstadoArca | null; fallo: boolean; cargado: boolean };
-
 // Muestra contra qué ambiente de ARCA se factura y, si falta configuración,
 // los problemas que informa el backend. Si la consulta falla no rompe la
-// página: avisa en una línea discreta y listo.
+// página: avisa en una línea discreta y listo. La consulta se comparte con
+// quien más la necesite en la misma pantalla (useEstadoArca).
 export default function EstadoArcaBanner() {
-  const [carga, setCarga] = useState<Carga>({ estado: null, fallo: false, cargado: false });
-
-  useEffect(() => {
-    let active = true;
-    fetchFacturacion<EstadoArca>("/api/facturacion/estado")
-      .then((res) => {
-        if (active) setCarga({ estado: res.data, fallo: false, cargado: true });
-      })
-      .catch(() => {
-        if (active) setCarga({ estado: null, fallo: true, cargado: true });
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const carga = useEstadoArca();
 
   if (!carga.cargado) return null;
 

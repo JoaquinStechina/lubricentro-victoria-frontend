@@ -20,6 +20,7 @@ import {
   type Venta,
 } from "@/app/lib/facturacion";
 import { useEmitirFactura } from "@/app/lib/useEmitirFactura";
+import { useEstadoArca } from "@/app/lib/useEstadoArca";
 import { useTablaRecurso } from "@/app/lib/useTablaRecurso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,11 @@ export default function VentasPage() {
   const [aFacturar, setAFacturar] = useState<Venta | null>(null);
   const [facturarOpen, setFacturarOpen] = useState(false);
   const { emitir, emitiendoId, resultado, limpiarResultado } = useEmitirFactura();
+  // Sin ARCA configurada el backend responde 503 a toda emisión: se deshabilita
+  // "Facturar" y se dice por qué en vez de dejar que cada clic falle. Si la
+  // consulta de estado falla no se bloquea nada (el backend decide).
+  const arca = useEstadoArca();
+  const arcaNoConfigurada = arca.cargado && arca.estado !== null && !arca.estado.configurado;
 
   useEffect(() => {
     let active = true;
@@ -164,6 +170,13 @@ export default function VentasPage() {
         <FacturacionNav />
         <EstadoArcaBanner />
 
+        {arcaNoConfigurada && (
+          <p role="status" className="mb-3 text-sm text-red-800 dark:text-red-300">
+            Facturar está deshabilitado: ARCA no está configurada en el servidor (ver el aviso de arriba). Podés cargar
+            y guardar ventas igual.
+          </p>
+        )}
+
         {emitiendoId !== null && !resultado && (
           <p
             role="status"
@@ -178,6 +191,7 @@ export default function VentasPage() {
             <ResultadoEmisionPanel
               resultado={resultado}
               reintentando={emitiendoId !== null}
+              ocultarVerVentas
               onReintentar={() => {
                 const v = data?.items.find((x) => x.id === resultado.ventaId);
                 if (v) void facturar(v);
@@ -270,7 +284,8 @@ export default function VentasPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={emitiendoId !== null}
+                            disabled={emitiendoId !== null || arcaNoConfigurada}
+                            title={arcaNoConfigurada ? "ARCA no está configurada: todavía no se puede facturar" : undefined}
                             onClick={() => {
                               setAFacturar(v);
                               setFacturarOpen(true);

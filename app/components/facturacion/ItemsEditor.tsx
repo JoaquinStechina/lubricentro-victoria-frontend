@@ -2,11 +2,12 @@
 
 import { PlusIcon, TriangleAlertIcon, Trash2Icon } from "lucide-react";
 import ProductoCatalogoPicker, { type ProductoElegido } from "@/app/components/facturacion/ProductoCatalogoPicker";
-import { formatearMoneda } from "@/app/lib/facturacion";
+import { formatearMonedaPrecio, formatearMoneda } from "@/app/lib/facturacion";
 import {
   ALICUOTAS_IVA,
   MAX_DESCRIPCION,
   MAX_ITEMS_VENTA,
+  AVISO_SIN_PRECIO,
   etiquetaAlicuota,
   evaluarItem,
   itemVacio,
@@ -60,10 +61,19 @@ export default function ItemsEditor({
   const lleno = items.length >= MAX_ITEMS_VENTA;
 
   function cambiar(clave: string, cambios: Partial<ItemFormulario>) {
-    // Si el usuario toca el precio, el origen del catálogo deja de describirlo.
-    const extra: Partial<ItemFormulario> =
-      cambios.precioUnitario !== undefined ? { origenPrecio: null, avisosCatalogo: [] } : {};
-    onChange(items.map((i) => (i.clave === clave ? { ...i, ...cambios, ...extra } : i)));
+    // Si el usuario toca el precio, el origen del catálogo (chip) y el aviso
+    // de "sin precio" dejan de describirlo; el resto de los avisos de la
+    // precarga (alícuota forzada a 21 %, moneda no ARS) siguen valiendo.
+    onChange(
+      items.map((i) => {
+        if (i.clave !== clave) return i;
+        const extra: Partial<ItemFormulario> =
+          cambios.precioUnitario !== undefined
+            ? { origenPrecio: null, avisosCatalogo: i.avisosCatalogo.filter((a) => a !== AVISO_SIN_PRECIO) }
+            : {};
+        return { ...i, ...cambios, ...extra };
+      }),
+    );
   }
 
   function agregarVacio() {
@@ -75,7 +85,7 @@ export default function ItemsEditor({
     if (lleno) return;
     const alicuotaValida = ALICUOTAS_IVA.some((v) => v === p.alicuotaIva);
     const avisos: string[] = [];
-    if (p.origenPrecio === "ninguno") avisos.push("Este producto no tiene precio en el catálogo: completalo a mano.");
+    if (p.origenPrecio === "ninguno") avisos.push(AVISO_SIN_PRECIO);
     if (p.moneda && p.moneda !== "ARS") avisos.push(`Ojo: en el catálogo está en ${p.moneda}, no en pesos.`);
     if (!alicuotaValida) {
       avisos.push(
@@ -202,7 +212,7 @@ export default function ItemsEditor({
                     />
                     {e.precioUnitario !== null && (
                       <p className="mt-0.5 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                        = {formatearMoneda(e.precioUnitario)}
+                        = {formatearMonedaPrecio(e.precioUnitario)}
                       </p>
                     )}
                   </div>

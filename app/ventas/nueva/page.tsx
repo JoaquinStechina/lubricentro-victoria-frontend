@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeftIcon, CheckCircle2Icon, Loader2Icon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import ClientePicker from "@/app/components/facturacion/ClientePicker";
 import ClienteDialog from "@/app/components/facturacion/ClienteDialog";
@@ -21,21 +21,14 @@ import {
   type VentaDetalle,
 } from "@/app/lib/facturacion";
 import { useEmitirFactura } from "@/app/lib/useEmitirFactura";
-import { evaluarItem, itemsParaGuardar, itemsParaPrevisualizar, type ItemFormulario } from "@/app/lib/ventasForm";
+import { usePrevisualizacion } from "@/app/lib/usePrevisualizacion";
+import { evaluarItem, itemsParaGuardar, type ItemFormulario } from "@/app/lib/ventasForm";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 const MAX_OBSERVACIONES = 500;
-const DEBOUNCE_PREVIEW_MS = 300;
-
-// Resultado de una vista previa, etiquetado con la consulta que lo originó
-// (`clave`): "está al día" se deriva comparando con la consulta vigente, así
-// una respuesta vieja y lenta nunca se muestra como si fuera la actual.
-type ResultadoPreview =
-  | { clave: string; ok: true; data: Previsualizacion }
-  | { clave: string; ok: false; error: ErrorApi };
 
 // Se remonta el formulario entero con otra `key` para "Cargar otra venta": es
 // la forma de empezar de cero sin copiar props a estado ni resetear a mano.
@@ -66,58 +59,11 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
   const ocupado = guardando || emitiendoId !== null;
 
   // ---- Vista previa (única fuente de totales: el backend) -----------------
-  const itemsPreview = useMemo(() => itemsParaPrevisualizar(items), [items]);
-  // Lo único que cambia el cálculo: cliente, tilde de IVA y cantidad/precio/
-  // alícuota. Descripción y observaciones no, para no consultar por cada tecla.
-  const claveConsulta = useMemo(
-    () =>
-      itemsPreview ? JSON.stringify({ clienteId: cliente?.id ?? null, preciosIncluyenIva, items: itemsPreview }) : null,
-    [itemsPreview, cliente, preciosIncluyenIva],
-  );
-  const [reintentoPreview, setReintentoPreview] = useState(0);
-  const claveVigente = claveConsulta ? `${reintentoPreview}|${claveConsulta}` : null;
-
-  const [claveDebounced, setClaveDebounced] = useState<string | null>(null);
-  useEffect(() => {
-    const id = setTimeout(() => setClaveDebounced(claveVigente), DEBOUNCE_PREVIEW_MS);
-    return () => clearTimeout(id);
-  }, [claveVigente]);
-
-  const [preview, setPreview] = useState<ResultadoPreview | null>(null);
-  useEffect(() => {
-    if (claveDebounced === null) return;
-    let active = true;
-    // El cuerpo se arma desde la propia clave: lo que se consulta es
-    // exactamente lo que identifica el resultado.
-    const cuerpo = claveDebounced.slice(claveDebounced.indexOf("|") + 1);
-    fetchFacturacion<Previsualizacion>("/api/ventas/previsualizar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: cuerpo,
-    })
-      .then((res) => {
-        if (active) setPreview({ clave: claveDebounced, ok: true, data: res.data });
-      })
-      .catch((err: unknown) => {
-        if (active) {
-          setPreview({
-            clave: claveDebounced,
-            ok: false,
-            error: err instanceof ErrorApi ? err : new ErrorApi(0, "No se pudo calcular el resumen."),
-          });
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [claveDebounced]);
-
-  // Está al día solo si es la respuesta a la consulta vigente. Mientras tanto
-  // (tipeando, request en vuelo) el resumen se atenúa y no se puede guardar.
-  const previewAlDia = preview !== null && claveVigente !== null && preview.clave === claveVigente;
-  const calculando = claveVigente !== null && !previewAlDia;
-  const calculo = previewAlDia && preview.ok ? preview.data : null;
-  const errorPreview = previewAlDia && !preview.ok ? preview.error : null;
+  const { itemsPreview, previewAlDia, calculando, calculo, errorPreview, reintentar } = usePrevisualizacion({
+    items,
+    clienteId: cliente?.id ?? null,
+    preciosIncluyenIva,
+  });
 
   // ---- Qué se puede hacer ------------------------------------------------
   const itemsGuardar = useMemo(() => itemsParaGuardar(items), [items]);
@@ -345,7 +291,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
                 calculando={calculando}
                 calculo={previewAlDia ? calculo : null}
                 error={errorPreview}
-                alReintentar={() => setReintentoPreview((n) => n + 1)}
+                alReintentar={reintentar}
               />
             </section>
 

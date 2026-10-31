@@ -316,7 +316,15 @@ function ClienteForm({
               ))}
             </ul>
           )}
-          {error.idEliminado !== null && (
+          {error.idEliminado !== null && cliente !== null && (
+            // En edición NO se ofrece restaurar: restaurar abriría OTRO
+            // cliente (el eliminado) y esta edición no se aplicaría.
+            <p className="mt-2">
+              Ese documento pertenece a un cliente eliminado, y esta edición no se aplicó. Usá otro documento, o
+              restaurá ese cliente desde Clientes (papelera) y editá el que corresponda.
+            </p>
+          )}
+          {error.idEliminado !== null && cliente === null && (
             <div className="mt-2 flex flex-col items-start gap-2">
               <p>
                 Para usar ese documento tenés que restaurar el cliente eliminado; se recupera con los datos que tenía

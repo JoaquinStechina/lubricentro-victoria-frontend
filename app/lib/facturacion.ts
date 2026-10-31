@@ -264,6 +264,20 @@ export function formatearMoneda(n: number): string {
   return formatoMoneda.format(Math.round(n * 100) === 0 ? 0 : n);
 }
 
+// Eco de un precio unitario TIPEADO por el usuario: el precio admite hasta 4
+// decimales y con formatearMoneda (2) "1,2345" se vería como "$ 1,23". Solo
+// para ese eco; los importes del backend siguen mostrándose con formatearMoneda.
+const formatoPrecio = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
+export function formatearMonedaPrecio(n: number): string {
+  return Number.isFinite(n) ? formatoPrecio.format(n) : "—";
+}
+
 // "0001-00000012"; "—" mientras el comprobante no tiene número.
 export function formatearNroComprobante(ptoVta: number, nro: number | null): string {
   if (nro === null) return "—";

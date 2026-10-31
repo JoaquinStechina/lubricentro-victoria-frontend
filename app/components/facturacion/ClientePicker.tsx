@@ -37,7 +37,7 @@ export default function ClientePicker({
   const [debounced, setDebounced] = useState("");
   // Cada respuesta guarda el término que la originó: así "cargando" se deriva
   // (término vigente !== término de la última respuesta) sin setState en efectos.
-  const [resultados, setResultados] = useState<{ termino: string; items: Cliente[] } | null>(null);
+  const [resultados, setResultados] = useState<{ termino: string; items: Cliente[]; fallo: boolean } | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebounced(query.trim()), 300);
@@ -53,12 +53,13 @@ export default function ClientePicker({
     if (debounced) params.set("search", debounced);
     fetchFacturacion<Paginado<Cliente>>(`/api/clientes?${params.toString()}`)
       .then((res) => {
-        if (active) setResultados({ termino: debounced, items: res.data.items });
+        if (active) setResultados({ termino: debounced, items: res.data.items, fallo: false });
       })
       .catch(() => {
-        // Sin resultados el picker queda vacío; la opción Consumidor Final y
+        // El picker queda sin resultados pero avisa que falló la búsqueda (no
+        // es lo mismo que "no hay coincidencias"); la opción Consumidor Final y
         // el resto de la pantalla siguen funcionando.
-        if (active) setResultados({ termino: debounced, items: [] });
+        if (active) setResultados({ termino: debounced, items: [], fallo: true });
       });
     return () => {
       active = false;
@@ -123,6 +124,10 @@ export default function ClientePicker({
             </CommandGroup>
             {cargando ? (
               <div className="py-3 text-center text-xs text-muted-foreground">Buscando…</div>
+            ) : resultados?.fallo ? (
+              <div role="alert" className="py-3 text-center text-xs text-destructive">
+                No se pudo buscar clientes. Probá de nuevo.
+              </div>
             ) : (
               items.length === 0 && (
                 // div y no CommandEmpty: con la opción fija "Consumidor Final"

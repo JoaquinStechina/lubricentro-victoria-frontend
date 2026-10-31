@@ -54,6 +54,11 @@ export function nuevaClave(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Aviso de la precarga que deja de valer en cuanto el usuario escribe un
+// precio (los demás avisos del catálogo —moneda, alícuota ajustada— siguen
+// valiendo aunque cambie el precio). ItemsEditor lo usa para filtrarlo.
+export const AVISO_SIN_PRECIO = "Este producto no tiene precio en el catálogo: completalo a mano.";
+
 export function itemVacio(): ItemFormulario {
   return {
     clave: nuevaClave(),
@@ -89,12 +94,24 @@ type Parseo =
 //    ser separador de miles (es-AR: mil doscientos treinta y cuatro) o decimal
 //    (1,234). Elegir en silencio convertiría un precio de $12.500 en $12,50.
 //  - "1.234,56" / "1,234.56" / "1.2.3": mezcla de separadores.
-// "1234.5" y "1234.56" (1, 2 o 4+ dígitos tras el punto) no son ambiguos.
+//  - "012.500" / "00.500": con la forma de miles pero con ceros a la izquierda
+//    no es un número bien escrito; sin esta regla caía al caso general y se
+//    leía en silencio como 12,5.
+// "1234.5" y "1234.56" (1, 2 o 4+ dígitos tras el punto) no son ambiguos, y
+// "0.500" / "0.5" son decimales (un solo cero antes del punto, un solo grupo).
 function parsearDecimal(texto: string): Parseo {
   const limpio = texto.trim();
   if (limpio === "") return { tipo: "vacio" };
   if (limpio.startsWith("-")) return { tipo: "error", mensaje: "No puede ser negativo." };
-  if (/^[1-9]\d{0,2}(?:\.\d{3})+$/.test(limpio)) {
+  const miles = /^(\d{1,3})((?:\.\d{3})+)$/.exec(limpio);
+  const esDecimalConCero = miles !== null && miles[1] === "0" && miles[2].length === 4;
+  if (miles && miles[1].startsWith("0") && !esDecimalConCero) {
+    return {
+      tipo: "error",
+      mensaje: "No uses ceros a la izquierda ni puntos de miles (ej. 12500); para decimales usá la coma (ej. 0,5).",
+    };
+  }
+  if (miles && !esDecimalConCero) {
     const sinPuntos = limpio.replace(/\./g, "");
     // Con más de un punto solo puede ser separador de miles (1.234.567).
     if (limpio.split(".").length > 2) {

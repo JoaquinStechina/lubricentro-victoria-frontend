@@ -4,13 +4,8 @@ import Link from "next/link";
 import { AlertTriangleIcon, CheckCircle2Icon, XCircleIcon } from "lucide-react";
 import { formatearNroComprobante, etiquetaTipo, textoObservaciones } from "@/app/lib/facturacion";
 import type { ResultadoEmision } from "@/app/lib/useEmitirFactura";
+import { AMBAR, CAJA, ROJO, VERDE } from "@/app/components/facturacion/estilos";
 import { Button } from "@/components/ui/button";
-
-const CAJA = "rounded-lg border px-4 py-3 text-sm";
-const ROJO = "border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200";
-const AMBAR = "border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100";
-const VERDE =
-  "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200";
 
 // Muestra el resultado de intentar facturar una venta. Ninguno de los estados
 // que no son "autorizado" se presenta como éxito, y todos dicen que la venta
@@ -20,11 +15,14 @@ export default function ResultadoEmisionPanel({
   onReintentar,
   reintentando,
   onCerrar,
+  ocultarVerVentas = false,
 }: {
   resultado: ResultadoEmision;
   onReintentar: () => void;
   reintentando: boolean;
   onCerrar?: () => void;
+  /** La pantalla que lo muestra ya es el listado de ventas: el enlace no tiene sentido. */
+  ocultarVerVentas?: boolean;
 }) {
   const cerrar = onCerrar && (
     <Button variant="ghost" size="sm" onClick={onCerrar}>
@@ -64,9 +62,11 @@ export default function ResultadoEmisionPanel({
         <p className="mt-2">La venta #{resultado.ventaId} está guardada.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button nativeButton={false} render={<Link href={`/facturacion/${c.id}`} />}>Abrir comprobante y reconciliar</Button>
-          <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
-            Ver ventas
-          </Button>
+          {!ocultarVerVentas && (
+            <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
+              Ver ventas
+            </Button>
+          )}
           {cerrar}
         </div>
       </div>
@@ -101,9 +101,11 @@ export default function ResultadoEmisionPanel({
           <Button variant="outline" nativeButton={false} render={<Link href={`/facturacion/${c.id}`} />}>
             Ver el intento
           </Button>
-          <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
-            Ver ventas
-          </Button>
+          {!ocultarVerVentas && (
+            <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
+              Ver ventas
+            </Button>
+          )}
           {cerrar}
         </div>
       </div>
@@ -115,7 +117,11 @@ export default function ResultadoEmisionPanel({
   // cuyo cuerpo no se pudo leer: no se sabe si la factura se emitió. Reintentar
   // es seguro porque reusa la misma clave de idempotencia: si ya se emitió,
   // devuelve ese comprobante.
-  const incierto = error.status === 0 || error.status >= 500 || (error.status >= 200 && error.status < 300);
+  // El 503 (ARCA sin configurar) es la excepción: el backend lo responde ANTES
+  // de crear nada, así que es un fracaso definitivo y no una duda.
+  const noConfigurada = error.status === 503;
+  const incierto =
+    error.status === 0 || (error.status >= 500 && !noConfigurada) || (error.status >= 200 && error.status < 300);
   // 409: el backend rechazó el pedido por el estado actual de la venta o de la
   // numeración; repetirlo tal cual no cambia el resultado. Se manda a mirar los
   // comprobantes de la venta.
@@ -124,7 +130,11 @@ export default function ResultadoEmisionPanel({
     <div role="alert" className={`${CAJA} ${ROJO}`}>
       <p className="flex items-center gap-2 text-base font-semibold">
         <XCircleIcon className="size-5 shrink-0" />
-        {incierto ? "No pudimos confirmar si la factura se emitió" : "No se pudo facturar la venta"}
+        {noConfigurada
+          ? "ARCA no está configurada: no se emitió nada"
+          : incierto
+            ? "No pudimos confirmar si la factura se emitió"
+            : "No se pudo facturar la venta"}
       </p>
       <p className="mt-2">{error.error}</p>
       {error.detalles.length > 0 && (
@@ -136,7 +146,9 @@ export default function ResultadoEmisionPanel({
       )}
       <p className="mt-2">
         La venta #{resultado.ventaId} quedó guardada.{" "}
-        {incierto
+        {noConfigurada
+          ? "No se creó ningún comprobante. Cuando ARCA esté configurada en el servidor vas a poder facturarla desde Ventas."
+          : incierto
           ? "Reintentar es seguro: se repite la misma operación y, si la factura ya se había emitido, no se duplica."
           : conflicto
             ? "Mirá sus comprobantes. Si el mensaje pide esperar unos minutos, cerrá este aviso y volvé a facturar más tarde."
@@ -152,9 +164,11 @@ export default function ResultadoEmisionPanel({
             {reintentando ? "Facturando…" : "Reintentar facturación"}
           </Button>
         )}
-        <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
-          Ver ventas
-        </Button>
+        {!ocultarVerVentas && (
+          <Button variant="outline" nativeButton={false} render={<Link href="/ventas" />}>
+            Ver ventas
+          </Button>
+        )}
         {cerrar}
       </div>
     </div>
