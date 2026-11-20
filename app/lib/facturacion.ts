@@ -72,6 +72,8 @@ export type EstadoArca = {
 export type ConfigFiscal = {
   id: number;
   razonSocial: string;
+  /** Si está, la factura lo muestra como título y la razón social va en una fila aparte. */
+  nombreFantasia: string | null;
   condicionIva: string;
   domicilioComercial: string;
   ingresosBrutos: string | null;
