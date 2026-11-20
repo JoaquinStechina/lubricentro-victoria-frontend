@@ -92,6 +92,7 @@ export default function DatosFiscalesPage() {
 
 type Valores = {
   razonSocial: string;
+  nombreFantasia: string;
   domicilioComercial: string;
   ingresosBrutos: string;
   inicioActividades: string;
@@ -101,6 +102,8 @@ type Valores = {
 function valoresDe(config: ConfigFiscal | null): Valores {
   return {
     razonSocial: config?.razonSocial ?? "",
+    // `?? ""` también cubre un backend viejo que todavía no devuelve el campo.
+    nombreFantasia: config?.nombreFantasia ?? "",
     domicilioComercial: config?.domicilioComercial ?? "",
     ingresosBrutos: config?.ingresosBrutos ?? "",
     inicioActividades: config?.inicioActividades ?? "",
@@ -152,6 +155,7 @@ function ConfigForm({ config }: { config: ConfigFiscal | null }) {
         jsonInit(
           {
             razonSocial: vacioANull(valores.razonSocial),
+            nombreFantasia: vacioANull(valores.nombreFantasia),
             condicionIva: "RI",
             domicilioComercial: vacioANull(valores.domicilioComercial),
             ingresosBrutos: vacioANull(valores.ingresosBrutos),
@@ -198,6 +202,20 @@ function ConfigForm({ config }: { config: ConfigFiscal | null }) {
           onChange={(e) => setCampo("razonSocial", e.target.value)}
           autoComplete="off"
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="nombreFantasia">Nombre de fantasía</Label>
+        <Input
+          id="nombreFantasia"
+          value={valores.nombreFantasia}
+          onChange={(e) => setCampo("nombreFantasia", e.target.value)}
+          autoComplete="off"
+          aria-describedby="nombreFantasia-ayuda"
+        />
+        <p id="nombreFantasia-ayuda" className="text-xs text-zinc-500 dark:text-zinc-400">
+          Opcional. Si lo cargás, sale como título de la factura y la razón social va debajo.
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
