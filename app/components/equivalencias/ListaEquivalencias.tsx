@@ -21,24 +21,30 @@ export function FilaEquivalencia({
 }) {
   const producto = r.productos[0];
   const sinProductos = r.productos.length === 0;
+  const nombre = (
+    <>
+      {r.marca ? `${r.marca} ` : ""}
+      {r.codigo}
+    </>
+  );
+  const claseNombre = cn("font-medium", !sinProductos && "text-foreground");
   return (
     <div
       className={cn("min-w-0 flex-1", sinProductos && "text-muted-foreground")}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <button
-          type="button"
-          disabled={!onElegir}
-          onClick={() => onElegir?.(r.codigo)}
-          className={cn(
-            "font-medium",
-            onElegir && "hover:underline",
-            !sinProductos && "text-foreground",
-          )}
-        >
-          {r.marca ? `${r.marca} ` : ""}
-          {r.codigo}
-        </button>
+        {/* Sin onElegir (Ctrl + K) va como texto: un botón deshabilitado se come el clic y la fila no se elige. */}
+        {onElegir ? (
+          <button
+            type="button"
+            onClick={() => onElegir(r.codigo)}
+            className={cn(claseNombre, "hover:underline")}
+          >
+            {nombre}
+          </button>
+        ) : (
+          <span className={claseNombre}>{nombre}</span>
+        )}
         {r.via && (
           <Badge variant="outline">
             vía {r.via.marca ? `${r.via.marca} ` : ""}
