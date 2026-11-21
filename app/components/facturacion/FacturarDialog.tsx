@@ -100,7 +100,10 @@ export default function FacturarDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* Más ancho que el default (sm:max-w-sm): el pie lleva hasta tres
+          botones («Cancelar», «Facturar sin descontar», «Facturar y
+          descontar») en una fila y no entran en 384 px. */}
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{hayDescontables ? "¿Descontar del stock?" : `¿Facturar la venta #${ventaId}?`}</DialogTitle>
           <DialogDescription>
