@@ -20,6 +20,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 
+// El Catálogo con el código buscado. `k` cambia en cada Enter: con el mismo
+// código ya en la URL, igual remonta el Catálogo y cambia de pestaña (app/page.tsx).
+function urlDelCatalogo(codigo: string): string {
+  return `/?search=${encodeURIComponent(codigo)}&k=${Date.now()}`;
+}
+
 // Ventana de búsqueda rápida de equivalencias, abierta con Ctrl + K desde cualquier pantalla.
 export default function AtajoEquivalencias() {
   const router = useRouter();
@@ -78,7 +84,7 @@ export default function AtajoEquivalencias() {
 
   function elegir(codigo: string) {
     cambiarAbierta(false);
-    router.push("/?search=" + encodeURIComponent(codigo));
+    router.push(urlDelCatalogo(codigo));
   }
 
   async function descartar(r: ResultadoEquivalencia) {

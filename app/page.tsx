@@ -12,20 +12,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Tab = "catalogo" | "ofertas";
 
+// Identifica cada llegada con `?search=`. La ventana Ctrl + K agrega `?k=`, un
+// número nuevo en cada Enter: elegir el mismo código otra vez también cuenta
+// como llegada (si no, la URL no cambia y no pasa nada). `k` nunca llega al
+// buscador, y un enlace con solo `?search=` sigue andando.
+function llegadaConBusqueda(params: URLSearchParams): string | null {
+  const search = params.get("search");
+  return search ? `${search}|${params.get("k") ?? ""}` : null;
+}
+
 // Lee `?search=` (lo usan los enlaces a un código). Va aparte para que el
 // Suspense que pide useSearchParams no cubra toda la página.
 function CatalogoConBusqueda() {
-  const search = useSearchParams().get("search") ?? undefined;
-  // La key remonta la vista cuando cambia ?search= (p. ej. Enter en la ventana Ctrl + K estando en el Catálogo).
-  return <CatalogoView key={search ?? ""} searchInicial={search} />;
+  const params = useSearchParams();
+  const search = params.get("search") ?? undefined;
+  // La key remonta la vista en cada llegada (p. ej. Enter en la ventana Ctrl + K estando en el Catálogo).
+  return <CatalogoView key={llegadaConBusqueda(params) ?? ""} searchInicial={search} />;
 }
 
-// Al llegar con un ?search= nuevo (p. ej. Enter en la ventana Ctrl + K) pasa a la pestaña Catálogo.
+// En cada llegada con ?search= (p. ej. Enter en la ventana Ctrl + K) pasa a la pestaña Catálogo.
 function CambiarACatalogoConBusqueda({ onBusqueda }: { onBusqueda: () => void }) {
-  const search = useSearchParams().get("search");
+  const llegada = llegadaConBusqueda(useSearchParams());
   useEffect(() => {
-    if (search) onBusqueda();
-  }, [search, onBusqueda]);
+    if (llegada) onBusqueda();
+  }, [llegada, onBusqueda]);
   return null;
 }
 

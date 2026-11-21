@@ -43,7 +43,7 @@ Las pantallas de facturación comparten `FacturacionNav` (Comprobantes, Ventas, 
 
 ## Ctrl + K (en cualquier pantalla)
 
-Ventana de búsqueda rápida para el mostrador (`AtajoEquivalencias.tsx`, montada en el layout). Busca el código y lista sus equivalencias, con «Descartar» por fila. El pie lleva a `/equivalencias?agregar=<código>` para agregar una a mano.
+Ventana de búsqueda rápida para el mostrador (`AtajoEquivalencias.tsx`, montada en el layout). Busca el código y lista sus equivalencias, con «Descartar» por fila. Enter abre el Catálogo con el código de la fila, aunque ya fuera lo buscado: la URL lleva `&k=<número>` para que cuente como una búsqueda nueva. El pie lleva a `/equivalencias?agregar=<código>` para agregar una a mano.
 
 ## Cargas (`/cargas`, `/cargas/[id]`)
 
