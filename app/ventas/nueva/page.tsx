@@ -6,6 +6,7 @@ import { ArrowLeftIcon, CheckCircle2Icon, Loader2Icon, PlusIcon, TriangleAlertIc
 import ClientePicker from "@/app/components/facturacion/ClientePicker";
 import ClienteDialog from "@/app/components/facturacion/ClienteDialog";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
+import FacturarDialog from "@/app/components/facturacion/FacturarDialog";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ItemsEditor from "@/app/components/facturacion/ItemsEditor";
 import ResultadoEmisionPanel from "@/app/components/facturacion/ResultadoEmisionPanel";
@@ -52,6 +53,13 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
   // Ref además del estado: dos clics en el mismo tick leen `guardando` viejo.
   const enVueloRef = useRef(false);
   const { emitir, emitiendoId, resultado, limpiarResultado } = useEmitirFactura();
+  const [facturarOpen, setFacturarOpen] = useState(false);
+  // Última decisión de descontar stock, para repetirla en "Reintentar".
+  const descontarRef = useRef(false);
+  function facturarConDecision(ventaId: number, descontarStock: boolean) {
+    descontarRef.current = descontarStock;
+    void emitir(ventaId, descontarStock);
+  }
 
   const bloqueado = ventaGuardada !== null;
   // Mientras se guarda o se factura, irse de la pantalla dejaría la operación
@@ -115,7 +123,8 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
         venta = res.data;
         setVentaGuardada(venta);
       }
-      if (facturar) await emitir(venta.id);
+      // Facturar pregunta antes si se descuenta del stock; si se cancela, la venta queda guardada.
+      if (facturar) setFacturarOpen(true);
     } catch (err) {
       setErrorGuardar(err instanceof ErrorApi ? err : new ErrorApi(0, "No se pudo guardar la venta."));
     } finally {
@@ -185,7 +194,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
               <div className="mt-3 flex flex-wrap gap-2">
                 {!resultado && (
                   <Button
-                    onClick={() => void emitir(ventaGuardada.id)}
+                    onClick={() => setFacturarOpen(true)}
                     disabled={emitiendoId !== null || guardando}
                   >
                     {emitiendoId !== null ? "Facturando…" : "Facturar ahora"}
@@ -210,7 +219,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
               <ResultadoEmisionPanel
                 resultado={resultado}
                 reintentando={emitiendoId !== null}
-                onReintentar={() => void emitir(ventaGuardada.id)}
+                onReintentar={() => facturarConDecision(ventaGuardada.id, descontarRef.current)}
                 // Un pendiente o un autorizado no se descartan: la venta ya NO está "sin
                 // facturar" y el único camino es abrir el comprobante.
                 onCerrar={resultado.tipo === "fallido" || resultado.tipo === "error" ? limpiarResultado : undefined}
@@ -339,6 +348,13 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
             )}
           </aside>
         </div>
+        <FacturarDialog
+          ventaId={ventaGuardada?.id ?? null}
+          open={facturarOpen && ventaGuardada !== null}
+          onOpenChange={setFacturarOpen}
+          onConfirmar={(descontar) => ventaGuardada && facturarConDecision(ventaGuardada.id, descontar)}
+          ocupado={emitiendoId !== null}
+        />
       </main>
     </div>
   );

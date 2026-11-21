@@ -509,6 +509,40 @@ export function jsonInit(body: unknown, method: "POST" | "PUT" | "PATCH" = "POST
 }
 
 // ---------------------------------------------------------------------------
+// Vista previa del descuento de stock al facturar
+// ---------------------------------------------------------------------------
+
+// Ítem de la venta que se puede descontar del stock. `quedaria` puede ser negativo.
+export type DescontableStock = {
+  articuloId: number;
+  marca: string;
+  codigo: string;
+  descripcion: string;
+  cantidad: number;
+  stockActual: number;
+  quedaria: number;
+};
+
+export type MotivoOmitido = "sin_articulo" | "cantidad_no_entera" | "articulo_eliminado";
+
+// Ítem que no se descuenta, con el motivo.
+export type OmitidoStock = { descripcion: string; motivo: MotivoOmitido };
+
+// GET /api/ventas/:id/stock
+export type VistaPreviaStock = { descontables: DescontableStock[]; omitidos: OmitidoStock[] };
+
+export const MOTIVO_OMITIDO: Record<MotivoOmitido, string> = {
+  sin_articulo: "no está en stock",
+  cantidad_no_entera: "cantidad no entera",
+  articulo_eliminado: "artículo eliminado",
+};
+
+export async function obtenerVistaPreviaStock(ventaId: number): Promise<VistaPreviaStock> {
+  const res = await fetchFacturacion<VistaPreviaStock>(`/api/ventas/${ventaId}/stock`);
+  return res.data;
+}
+
+// ---------------------------------------------------------------------------
 // Ventas ya facturadas por fuera
 // ---------------------------------------------------------------------------
 
