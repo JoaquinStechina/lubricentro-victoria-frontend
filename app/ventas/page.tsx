@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeftIcon, Loader2Icon, PlusIcon, ReceiptIcon, Trash2Icon } from "lucide-react";
+import { ArrowLeftIcon, FileCheckIcon, Loader2Icon, PlusIcon, ReceiptIcon, Trash2Icon } from "lucide-react";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ResultadoEmisionPanel from "@/app/components/facturacion/ResultadoEmisionPanel";
@@ -15,6 +15,7 @@ import {
   formatearFechaIso,
   formatearMoneda,
   jsonInit,
+  referenciaFacturaExterna,
   type EstadoFactura,
   type Paginado,
   type Venta,
@@ -45,7 +46,9 @@ const SIN_FILTROS: Record<string, string> = {};
 type Carga = { clave: string; data: Paginado<Venta> | null; error: string | null };
 
 // "Pendiente" tiene que destacar (hay que reconciliar con ARCA): ámbar, que no
-// existe como variante de Badge. Facturada va en esmeralda; el resto, neutro.
+// existe como variante de Badge. Facturada va en esmeralda; facturada por
+// fuera en celeste, para que no se confunda con una factura del sistema; el
+// resto, neutro.
 const ESTILO_ESTADO: Record<EstadoFactura, string> = {
   sin_facturar: "",
   pendiente:
@@ -53,12 +56,14 @@ const ESTILO_ESTADO: Record<EstadoFactura, string> = {
   facturada:
     "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200",
   con_notas: "",
+  facturada_fuera:
+    "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-200",
 };
 
 function BadgeEstadoFactura({ estado }: { estado: EstadoFactura }) {
   return (
     <Badge
-      variant={estado === "sin_facturar" || estado === "con_notas" ? "outline" : "secondary"}
+      variant={estado === "sin_facturar" || estado === "con_notas" || estado === "facturada_fuera" ? "outline" : "secondary"}
       className={ESTILO_ESTADO[estado]}
     >
       {etiquetaEstadoFactura(estado)}
@@ -151,7 +156,18 @@ export default function VentasPage() {
             )}
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">Ventas</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {ocupado ? (
+              <Button variant="outline" disabled>
+                <FileCheckIcon />
+                Registrar venta ya facturada
+              </Button>
+            ) : (
+              <Button variant="outline" nativeButton={false} render={<Link href="/ventas/ya-facturada" />}>
+                <FileCheckIcon />
+                Registrar venta ya facturada
+              </Button>
+            )}
             {ocupado ? (
               <Button disabled>
                 <PlusIcon />
@@ -276,7 +292,17 @@ export default function VentasPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <BadgeEstadoFactura estado={v.estadoFactura} />
+                      <div className="flex flex-col items-start gap-1">
+                        <BadgeEstadoFactura estado={v.estadoFactura} />
+                        {v.facturaExterna && (
+                          <span
+                            title="Factura emitida fuera del sistema: no se informa a ARCA desde acá"
+                            className="font-mono text-xs text-zinc-600 dark:text-zinc-400"
+                          >
+                            {referenciaFacturaExterna(v.facturaExterna)}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
@@ -294,7 +320,7 @@ export default function VentasPage() {
                             <ReceiptIcon />
                             {emitiendoId === v.id ? "Facturando…" : "Facturar"}
                           </Button>
-                        ) : (
+                        ) : v.estadoFactura === "facturada_fuera" ? null : (
                           <Button
                             variant="outline"
                             size="sm"
@@ -439,8 +465,9 @@ function EliminarVentaDialog({
         <DialogHeader>
           <DialogTitle>¿Eliminar la venta #{venta?.id}?</DialogTitle>
           <DialogDescription>
-            La venta deja de aparecer en el listado. No se puede eliminar si tiene una factura autorizada o pendiente
-            de confirmar con ARCA.
+            {venta?.facturaExterna
+              ? `La venta deja de aparecer en el listado. Su factura (${referenciaFacturaExterna(venta.facturaExterna)}) sigue existiendo en ARCA: eliminarla acá no la anula.`
+              : "La venta deja de aparecer en el listado. No se puede eliminar si tiene una factura autorizada o pendiente de confirmar con ARCA."}
           </DialogDescription>
         </DialogHeader>
         {error && (
