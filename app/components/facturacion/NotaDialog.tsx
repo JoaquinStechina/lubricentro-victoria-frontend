@@ -448,7 +448,9 @@ function NotaForm({
             </>
           ) : (
             <p className="text-zinc-700 dark:text-zinc-300">
-              El descuento de stock de esta factura todavía no se aplicó: si elegís reponer, el stock queda como estaba.
+              El descuento de stock de esta factura todavía no se aplicó. Si elegís reponer, el stock queda como estaba.
+              Si elegís no reponer, el descuento pendiente se aplica igual más adelante y la mercadería cuenta como
+              vendida.
             </p>
           )}
           <label className="flex cursor-pointer items-start gap-2">

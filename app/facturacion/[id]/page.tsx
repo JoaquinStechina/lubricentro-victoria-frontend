@@ -580,7 +580,7 @@ function SeccionStock({ comprobante: c }: { comprobante: ComprobanteDetalle }) {
           {stock.estado === "cancelado" && <p>Descuento de stock cancelado por la anulación</p>}
           {stock.estado === "pendiente" && (
             <>
-              <p>Descuento de stock pendiente</p>
+              <p>{esNota ? "Reposición de stock pendiente" : "Descuento de stock pendiente"}</p>
               {c.estado === "autorizado" ? (
                 <div>
                   <Button size="sm" onClick={() => void aplicar()} disabled={aplicando}>
@@ -595,6 +595,13 @@ function SeccionStock({ comprobante: c }: { comprobante: ComprobanteDetalle }) {
           {errorAplicar && (
             <p role="alert" className="text-red-700 dark:text-red-400">
               {errorAplicar}
+            </p>
+          )}
+          {stock.estado === "aplicado" && stock.movimientos.length === 0 && (
+            <p className="text-zinc-600 dark:text-zinc-400">
+              {esNota
+                ? "Sin movimientos: la factura no tenía nada descontado para reponer."
+                : "Sin movimientos: no había nada para descontar."}
             </p>
           )}
           {stock.estado === "aplicado" && stock.movimientos.length > 0 && (
