@@ -12,7 +12,7 @@
 | `/ventas/ya-facturada` | Registrar una venta que ya se facturó por otro medio. **Nunca va a ARCA.** | `/api/ventas/externas`, `/api/ventas/previsualizar` |
 | `/clientes` | Receptores de facturas. | `/api/clientes*` |
 | `/facturacion` | Comprobantes emitidos, con filtros. Admite `?ventaId=`. | `/api/facturacion/comprobantes` |
-| `/facturacion/[id]` | Detalle, PDF, notas y reconciliación. | `/api/facturacion/comprobantes/:id*` |
+| `/facturacion/[id]` | Detalle, PDF, notas, reconciliación y estado del stock. | `/api/facturacion/comprobantes/:id*` (incl. `/stock`) |
 | `/facturacion/config` | Datos fiscales del emisor y punto de venta. | `/api/facturacion/config` |
 
 Las pantallas de facturación comparten `FacturacionNav` (Comprobantes, Ventas, Clientes y Datos fiscales) y el banner de estado de ARCA. Ver [facturacion.md](facturacion.md).

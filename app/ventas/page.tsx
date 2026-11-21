@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeftIcon, FileCheckIcon, Loader2Icon, PlusIcon, ReceiptIcon, Trash2Icon } from "lucide-react";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
+import FacturarDialog from "@/app/components/facturacion/FacturarDialog";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ResultadoEmisionPanel from "@/app/components/facturacion/ResultadoEmisionPanel";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
@@ -80,6 +81,8 @@ export default function VentasPage() {
   const [aFacturar, setAFacturar] = useState<Venta | null>(null);
   const [facturarOpen, setFacturarOpen] = useState(false);
   const { emitir, emitiendoId, resultado, limpiarResultado } = useEmitirFactura();
+  // Última decisión de descontar stock por venta, para los reintentos.
+  const decisiones = useRef(new Map<number, boolean>());
   // Sin ARCA configurada el backend responde 503 a toda emisión: se deshabilita
   // "Facturar" y se dice por qué en vez de dejar que cada clic falle. Si la
   // consulta de estado falla no se bloquea nada (el backend decide).
@@ -122,8 +125,10 @@ export default function VentasPage() {
 
   // Tras facturar (sea cual sea el resultado) la fila cambia de estado: se
   // refresca la lista. Si fue autorizada el hook ya está navegando al detalle.
-  async function facturar(venta: Venta) {
-    const r = await emitir(venta.id);
+  async function facturar(ventaId: number, descontarStock: boolean) {
+    // Un "Reintentar" repite la misma decisión.
+    decisiones.current.set(ventaId, descontarStock);
+    const r = await emitir(ventaId, descontarStock);
     if (r && r.tipo !== "autorizado") recargar();
   }
 
@@ -209,9 +214,7 @@ export default function VentasPage() {
               reintentando={emitiendoId !== null}
               ocultarVerVentas
               onReintentar={() => {
-                const v = data?.items.find((x) => x.id === resultado.ventaId);
-                if (v) void facturar(v);
-                else void emitir(resultado.ventaId).then((r) => r && r.tipo !== "autorizado" && recargar());
+                void facturar(resultado.ventaId, decisiones.current.get(resultado.ventaId) ?? false);
               }}
               onCerrar={resultado.tipo === "fallido" || resultado.tipo === "error" ? limpiarResultado : undefined}
             />
@@ -362,11 +365,14 @@ export default function VentasPage() {
           className="mt-2"
         />
 
-        <ConfirmarFacturarDialog
-          venta={aFacturar}
+        <FacturarDialog
+          ventaId={aFacturar?.id ?? null}
           open={facturarOpen}
           onOpenChange={setFacturarOpen}
-          onConfirmar={(v) => void facturar(v)}
+          onConfirmar={(descontar) => aFacturar && void facturar(aFacturar.id, descontar)}
+          ocupado={emitiendoId !== null}
+          cliente={aFacturar?.cliente?.nombre}
+          total={aFacturar?.impTotal}
         />
         <EliminarVentaDialog
           venta={aEliminar}
@@ -376,49 +382,6 @@ export default function VentasPage() {
         />
       </main>
     </div>
-  );
-}
-
-// Emitir una factura no se deshace (corregirla exige una nota de crédito):
-// por eso pide confirmación. Confirmar es la "intención" de emitir; la clave de
-// idempotencia la maneja useEmitirFactura.
-function ConfirmarFacturarDialog({
-  venta,
-  open,
-  onOpenChange,
-  onConfirmar,
-}: {
-  venta: Venta | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirmar: (venta: Venta) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>¿Facturar la venta #{venta?.id}?</DialogTitle>
-          <DialogDescription>
-            Se emite el comprobante a {venta?.cliente?.nombre ?? "Consumidor Final"}
-            {venta?.impTotal != null ? ` por ${formatearMoneda(venta.impTotal)}` : ""}. Una factura autorizada no se
-            puede editar ni borrar: para corregirla hay que emitir una nota de crédito.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={() => {
-              onOpenChange(false);
-              if (venta) onConfirmar(venta);
-            }}
-          >
-            Facturar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

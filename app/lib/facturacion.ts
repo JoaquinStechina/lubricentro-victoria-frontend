@@ -248,6 +248,8 @@ export type ItemEntrada = {
   precioUnitario: number;
   alicuotaIva: number;
   productoPrecioId?: number | null;
+  /** Artículo de stock vinculado (solo la venta del sistema; las externas lo ignoran). */
+  articuloStockId?: number | null;
 };
 
 export type LineaCalculada = { neto: number; iva: number; total: number };
@@ -507,6 +509,76 @@ export function jsonInit(body: unknown, method: "POST" | "PUT" | "PATCH" = "POST
 }
 
 // ---------------------------------------------------------------------------
+// Vista previa del descuento de stock al facturar
+// ---------------------------------------------------------------------------
+
+// Ítem de la venta que se puede descontar del stock. `quedaria` puede ser negativo.
+export type DescontableStock = {
+  articuloId: number;
+  marca: string;
+  codigo: string;
+  descripcion: string;
+  cantidad: number;
+  stockActual: number;
+  quedaria: number;
+};
+
+export type MotivoOmitido = "sin_articulo" | "cantidad_no_entera" | "articulo_eliminado";
+
+// Ítem que no se descuenta, con el motivo.
+export type OmitidoStock = { descripcion: string; motivo: MotivoOmitido };
+
+// GET /api/ventas/:id/stock
+export type VistaPreviaStock = { descontables: DescontableStock[]; omitidos: OmitidoStock[] };
+
+export const MOTIVO_OMITIDO: Record<MotivoOmitido, string> = {
+  sin_articulo: "no está en stock",
+  cantidad_no_entera: "cantidad no entera",
+  articulo_eliminado: "artículo eliminado",
+};
+
+export async function obtenerVistaPreviaStock(ventaId: number): Promise<VistaPreviaStock> {
+  const res = await fetchFacturacion<VistaPreviaStock>(`/api/ventas/${ventaId}/stock`);
+  return res.data;
+}
+
+// ---------------------------------------------------------------------------
+// Stock de un comprobante (descuento al facturar, reposición al anular)
+// ---------------------------------------------------------------------------
+
+export type EstadoStockComprobante = "no" | "pendiente" | "aplicado" | "cancelado";
+
+export type MovimientoStockComprobante = {
+  articuloId: number;
+  marca: string;
+  codigo: string;
+  descripcion: string;
+  tipo: "salida" | "entrada";
+  /** Siempre positiva: el sentido lo da `tipo`. */
+  cantidad: number;
+};
+
+// GET y POST /api/facturacion/comprobantes/:id/stock. Con "cancelado",
+// `aplicadoEn` es el momento de la cancelación, no de un descuento.
+export type StockComprobante = {
+  estado: EstadoStockComprobante;
+  aplicadoEn: string | null;
+  movimientos: MovimientoStockComprobante[];
+};
+
+export async function obtenerStockComprobante(id: number): Promise<StockComprobante> {
+  const res = await fetchFacturacion<StockComprobante>(`/api/facturacion/comprobantes/${id}/stock`);
+  return res.data;
+}
+
+// Aplica un ajuste pendiente. 409 = no hay nada que aplicar (ya se aplicó,
+// se canceló o el comprobante todavía no está autorizado).
+export async function aplicarStockComprobante(id: number): Promise<StockComprobante> {
+  const res = await fetchFacturacion<StockComprobante>(`/api/facturacion/comprobantes/${id}/stock`, { method: "POST" });
+  return res.data;
+}
+
+// ---------------------------------------------------------------------------
 // Ventas ya facturadas por fuera
 // ---------------------------------------------------------------------------
 
@@ -525,4 +597,35 @@ export type NuevaVentaExterna = {
 
 export function registrarVentaExterna(body: NuevaVentaExterna): Promise<RespuestaApi<VentaDetalle>> {
   return fetchFacturacion<VentaDetalle>("/api/ventas/externas", jsonInit(body, "POST"));
+}
+
+// Artículo de stock ofrecido para una venta (GET /api/stock/para-venta).
+export type ArticuloParaVenta = {
+  id: number;
+  marca: string;
+  codigo: string;
+  descripcion: string;
+  cantidad: number;
+  /** Precio final con IVA sugerido por el catálogo; null si no hay. */
+  precioSugerido: number | null;
+};
+
+// Artículo de stock vinculado a un ítem de la venta.
+export type ArticuloVinculado = { id: number; marca: string; codigo: string; cantidad: number };
+
+export async function buscarArticulosParaVenta(search: string): Promise<ArticuloParaVenta[]> {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  const res = await fetchFacturacion<{ items: ArticuloParaVenta[] }>(`/api/stock/para-venta?${params.toString()}`);
+  return res.data.items;
+}
+
+// El artículo cuyo código coincide exactamente, o null si no hay uno solo.
+export async function articuloPorCodigo(codigo: string): Promise<ArticuloVinculado | null> {
+  const params = new URLSearchParams({ codigo });
+  const res = await fetchFacturacion<{ articulo: (ArticuloVinculado & { descripcion?: string }) | null }>(
+    `/api/stock/por-codigo?${params.toString()}`,
+  );
+  const a = res.data.articulo;
+  return a ? { id: a.id, marca: a.marca, codigo: a.codigo, cantidad: a.cantidad } : null;
 }

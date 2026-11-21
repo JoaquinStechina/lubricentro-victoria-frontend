@@ -75,7 +75,7 @@ function RegistrarVentaYaFacturada({ onOtra }: { onOtra: () => void }) {
   const [fecha, setFecha] = useState(hoy);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [avisoCliente, setAvisoCliente] = useState<string | null>(null);
-  const [preciosIncluyenIva, setPreciosIncluyenIva] = useState(false);
+  const [preciosIncluyenIva, setPreciosIncluyenIva] = useState(true);
   const [items, setItems] = useState<ItemFormulario[]>([]);
   const [observaciones, setObservaciones] = useState("");
 
@@ -343,6 +343,7 @@ function RegistrarVentaYaFacturada({ onOtra }: { onOtra: () => void }) {
             <ItemsEditor
               items={items}
               onChange={setItems}
+              permitirStock={false}
               preciosIncluyenIva={preciosIncluyenIva}
               importes={previewAlDia && calculo && calculo.lineas.length === items.length ? calculo.lineas.map((l) => l.total) : null}
             />

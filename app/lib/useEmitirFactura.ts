@@ -33,6 +33,9 @@ function clasificar(ventaId: number, status: number, comprobante: ComprobanteCon
 // ejemplo "Reintentar facturación" tras un rechazo— usa una clave nueva, porque
 // con la misma el backend devolvería otra vez el comprobante rechazado.
 //
+// Descontar stock: la decisión viaja en el body. Un reintento con la misma
+// clave devuelve el mismo comprobante y el backend respeta la PRIMERA decisión.
+//
 // Doble envío: `enVuelo` es un ref (no solo el estado `emitiendoId`, que recién
 // se actualiza en el próximo render): dos clics en el mismo tick no pasan.
 export function useEmitirFactura() {
@@ -56,7 +59,7 @@ export function useEmitirFactura() {
   // Devuelve null si ya había una emisión en curso (el segundo clic se ignora;
   // el primero es quien procesa el resultado).
   const emitir = useCallback(
-    async (ventaId: number): Promise<ResultadoEmision | null> => {
+    async (ventaId: number, descontarStock: boolean): Promise<ResultadoEmision | null> => {
       if (enVuelo.current) return null;
       enVuelo.current = true;
       setEmitiendoId(ventaId);
@@ -72,7 +75,7 @@ export function useEmitirFactura() {
       try {
         const res = await fetchFacturacion<ComprobanteConItems>(
           "/api/facturacion/comprobantes",
-          jsonInit({ ventaId, claveIdempotencia }, "POST"),
+          jsonInit({ ventaId, claveIdempotencia, descontarStock }, "POST"),
         );
         // El backend respondió con un comprobante: la intención terminó.
         claves.current.delete(ventaId);

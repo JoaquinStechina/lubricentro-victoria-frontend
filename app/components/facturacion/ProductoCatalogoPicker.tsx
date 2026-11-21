@@ -17,6 +17,8 @@ export type ProductoElegido = {
   productoPrecioId: number;
   origenPrecio: OrigenPrecio;
   moneda: string;
+  /** SKU del proveedor de la fila (para vincular el artículo de stock). */
+  skuProveedor: string | null;
 };
 
 // Descripción a mostrar de una fila de catálogo: algunas no tienen.
@@ -25,10 +27,10 @@ function descripcionDe(p: Producto): string {
   return base.slice(0, MAX_DESCRIPCION);
 }
 
-// Precio sugerido para la venta: el neto; si no hay, el con IVA.
+// Precio para la venta oficial: el sugerido (costo con IVA + margen, ya con
+// IVA incluido). Nunca cae al costo del proveedor.
 function precioDe(p: Producto): { precio: number | null; origen: OrigenPrecio } {
-  if (p.precioNeto !== null) return { precio: p.precioNeto, origen: "neto" };
-  if (p.precioConIva !== null) return { precio: p.precioConIva, origen: "conIva" };
+  if (p.precioSugerido !== null) return { precio: p.precioSugerido, origen: "sugerido" };
   return { precio: null, origen: "ninguno" };
 }
 
@@ -83,6 +85,7 @@ export default function ProductoCatalogoPicker({
       productoPrecioId: p.id,
       origenPrecio: origen,
       moneda: p.moneda,
+      skuProveedor: p.skuProveedor,
     });
     setOpen(false);
   }
@@ -105,7 +108,7 @@ export default function ProductoCatalogoPicker({
           <CommandList>
             <CommandGroup>
               {items.map((p) => {
-                const { precio, origen } = precioDe(p);
+                const { precio } = precioDe(p);
                 return (
                   <CommandItem key={p.id} value={String(p.id)} onSelect={() => elegir(p)}>
                     <span className="flex w-full items-center justify-between gap-3">
@@ -122,7 +125,7 @@ export default function ProductoCatalogoPicker({
                           <>
                             <span className="block font-medium">{formatearMoneda(precio)}</span>
                             <span className="block text-muted-foreground">
-                              {origen === "neto" ? "neto" : "con IVA"}
+                              sugerido con IVA
                             </span>
                           </>
                         )}

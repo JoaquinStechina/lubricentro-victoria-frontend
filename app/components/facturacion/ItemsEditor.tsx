@@ -1,10 +1,18 @@
 "use client";
 
-import { PlusIcon, TriangleAlertIcon, Trash2Icon } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { PlusIcon, TriangleAlertIcon, Trash2Icon, XIcon } from "lucide-react";
 import ProductoCatalogoPicker, { type ProductoElegido } from "@/app/components/facturacion/ProductoCatalogoPicker";
-import { formatearMonedaPrecio, formatearMoneda } from "@/app/lib/facturacion";
+import StockArticuloPicker from "@/app/components/facturacion/StockArticuloPicker";
+import {
+  articuloPorCodigo,
+  formatearMonedaPrecio,
+  formatearMoneda,
+  type ArticuloParaVenta,
+} from "@/app/lib/facturacion";
 import {
   ALICUOTAS_IVA,
+  ALICUOTA_POR_DEFECTO,
   MAX_DESCRIPCION,
   MAX_ITEMS_VENTA,
   AVISO_SIN_PRECIO,
@@ -39,7 +47,7 @@ function advertenciaIva(origen: ItemFormulario["origenPrecio"], preciosIncluyenI
   if (origen === "neto" && preciosIncluyenIva) {
     return "Este precio es neto (sin IVA) pero la venta tiene tildado «Los precios incluyen IVA»: se tomaría como precio final.";
   }
-  if (origen === "conIva" && !preciosIncluyenIva) {
+  if ((origen === "conIva" || origen === "sugerido") && !preciosIncluyenIva) {
     return "Este precio ya incluye IVA pero la venta no tiene tildado «Los precios incluyen IVA»: se le sumaría IVA encima.";
   }
   return null;
@@ -56,14 +64,27 @@ export default function ItemsEditor({
   preciosIncluyenIva = false,
   importes = null,
   disabled = false,
+  permitirStock = true,
 }: {
   items: ItemFormulario[];
   onChange: (items: ItemFormulario[]) => void;
   preciosIncluyenIva?: boolean;
   importes?: number[] | null;
   disabled?: boolean;
+  /** false en las ventas ya facturadas por fuera: no tocan el stock. */
+  permitirStock?: boolean;
 }) {
   const lleno = items.length >= MAX_ITEMS_VENTA;
+  // El vínculo automático es asíncrono: al volver la respuesta hay que partir
+  // de los ítems de ese momento, no de los del render que lo pidió. Y si para
+  // entonces el editor está bloqueado (la venta ya se guardó o se está
+  // guardando), no se vincula: mostraría un vínculo que la venta guardada no tiene.
+  const itemsRef = useRef(items);
+  const disabledRef = useRef(disabled);
+  useEffect(() => {
+    itemsRef.current = items;
+    disabledRef.current = disabled;
+  }, [items, disabled]);
 
   function cambiar(clave: string, cambios: Partial<ItemFormulario>) {
     // Si el usuario toca el precio, el origen del catálogo (chip) y el aviso
@@ -97,10 +118,11 @@ export default function ItemsEditor({
         `La alícuota del catálogo (${etiquetaAlicuota(p.alicuotaIva)}) no está soportada para facturar: se puso 21 %, revisala.`,
       );
     }
+    const clave = nuevaClave();
     onChange([
       ...items,
       {
-        clave: nuevaClave(),
+        clave,
         descripcion: p.descripcion,
         cantidad: "1",
         precioUnitario: p.precioUnitario === null ? "" : numeroATexto(p.precioUnitario),
@@ -108,6 +130,42 @@ export default function ItemsEditor({
         productoPrecioId: p.productoPrecioId,
         origenPrecio: p.origenPrecio,
         avisosCatalogo: avisos,
+        articuloStock: null,
+      },
+    ]);
+    if (permitirStock && p.skuProveedor) vincularPorCodigo(clave, p.skuProveedor);
+  }
+
+  // Busca el artículo de stock con ese código y lo vincula al ítem `clave`,
+  // solo si el editor sigue editable y el ítem sigue existiendo sin vínculo.
+  // Si falla, el ítem queda sin vincular y no se avisa.
+  function vincularPorCodigo(clave: string, codigo: string) {
+    articuloPorCodigo(codigo)
+      .then((articulo) => {
+        if (!articulo || disabledRef.current) return;
+        const actuales = itemsRef.current;
+        const destino = actuales.find((i) => i.clave === clave);
+        if (!destino || destino.articuloStock) return;
+        onChange(actuales.map((i) => (i.clave === clave ? { ...i, articuloStock: articulo } : i)));
+      })
+      .catch(() => {});
+  }
+
+  function agregarDeStock(a: ArticuloParaVenta) {
+    if (lleno) return;
+    const precio = a.precioSugerido;
+    onChange([
+      ...items,
+      {
+        clave: nuevaClave(),
+        descripcion: `${a.marca} ${a.codigo} ${a.descripcion}`.slice(0, MAX_DESCRIPCION),
+        cantidad: "1",
+        precioUnitario: precio === null ? "" : numeroATexto(precio),
+        alicuotaIva: String(ALICUOTA_POR_DEFECTO),
+        productoPrecioId: null,
+        origenPrecio: precio === null ? "ninguno" : "sugerido",
+        avisosCatalogo: precio === null ? [AVISO_SIN_PRECIO] : [],
+        articuloStock: { id: a.id, marca: a.marca, codigo: a.codigo, cantidad: a.cantidad },
       },
     ]);
   }
@@ -120,6 +178,7 @@ export default function ItemsEditor({
         </h2>
         <div className="flex flex-wrap gap-2">
           <ProductoCatalogoPicker onElegir={agregarDeCatalogo} disabled={disabled || lleno} />
+          {permitirStock && <StockArticuloPicker onElegir={agregarDeStock} disabled={disabled || lleno} />}
           <Button type="button" variant="outline" onClick={agregarVacio} disabled={disabled || lleno}>
             <PlusIcon />
             Agregar ítem vacío
@@ -267,10 +326,29 @@ export default function ItemsEditor({
                     </Button>
                   </div>
                 </div>
+                {item.articuloStock && (
+                  <div className="mt-1.5 flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+                    <Badge variant="outline">
+                      Stock: {item.articuloStock.marca} {item.articuloStock.codigo} · hay {item.articuloStock.cantidad}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Desvincular del stock"
+                      title="Desvincular del stock"
+                      onClick={() => cambiar(item.clave, { articuloStock: null })}
+                      disabled={disabled}
+                    >
+                      <XIcon />
+                    </Button>
+                  </div>
+                )}
                 {(item.origenPrecio || item.avisosCatalogo.length > 0) && (
                   <div className="mt-1.5 flex flex-col gap-0.5 text-xs">
                     <div className="flex flex-wrap items-center gap-2 text-zinc-600 dark:text-zinc-400">
                       {item.origenPrecio === "neto" && <Badge variant="outline">Precio neto del catálogo</Badge>}
+                      {item.origenPrecio === "sugerido" && <Badge variant="outline">Precio sugerido del catálogo</Badge>}
                       {item.origenPrecio === "conIva" && <Badge variant="outline">Precio con IVA del catálogo</Badge>}
                       {item.avisosCatalogo.map((a) => (
                         <span key={a}>{a}</span>

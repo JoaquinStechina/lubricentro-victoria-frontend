@@ -14,12 +14,14 @@ import {
   formatearMoneda,
   formatearNroComprobante,
   jsonInit,
+  obtenerStockComprobante,
   textoObservaciones,
   varianteEstado,
   type ComprobanteConItems,
   type ComprobanteDetalle,
   type ItemEntrada,
   type Previsualizacion,
+  type StockComprobante,
 } from "@/app/lib/facturacion";
 import { usePrevisualizacion } from "@/app/lib/usePrevisualizacion";
 import { etiquetaAlicuota, itemVacio, itemsParaGuardar, nuevaClave, type ItemFormulario } from "@/app/lib/ventasForm";
@@ -34,6 +36,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
+const formatoCantidad = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
 
 export type Naturaleza = "credito" | "debito";
 
@@ -63,11 +67,11 @@ function esIncierto(error: ErrorApi): boolean {
 // autorizado. El botón que lo abre y el diálogo viven acá.
 //
 // Idempotencia: la clave identifica una INTENCIÓN de emitir esta nota. Se
-// guarda en un ref junto con una huella del pedido (naturaleza + ítems) y se
-// REUTILIZA mientras el backend no haya respondido con un comprobante (error
-// de red, timeout, 5xx, doble clic, incluso cerrando y reabriendo el diálogo):
-// si el servidor sí procesó el pedido, repetir la clave devuelve esa nota en
-// vez de emitir otra. Si el usuario cambia lo que va a emitir, la huella
+// guarda en un ref junto con una huella del pedido (naturaleza + ítems + si
+// repone stock) y se REUTILIZA mientras el backend no haya respondido con un
+// comprobante (error de red, timeout, 5xx, doble clic, incluso cerrando y
+// reabriendo el diálogo): si el servidor sí procesó el pedido, repetir la
+// clave devuelve esa nota en vez de emitir otra. Si el usuario cambia lo que va a emitir, la huella
 // cambia y se usa una clave nueva. En cuanto el backend devuelve un
 // comprobante (de cualquier estado) la intención terminó y la clave se
 // descarta. El ref vive en este componente (no en el formulario) para que
@@ -111,15 +115,18 @@ export default function NotaDialog({
   // `items` undefined = anulación total (el campo se OMITE del pedido; un []
   // es un error de validación en el backend, no un "total").
   // Devuelve null si ya había un envío en curso (el segundo clic se ignora).
-  async function enviar(items: ItemEntrada[] | undefined): Promise<ResultadoNota | null> {
+  // `reponerStock` solo puede ser true en una anulación total.
+  async function enviar(items: ItemEntrada[] | undefined, reponerStock: boolean): Promise<ResultadoNota | null> {
     if (enVuelo.current) return null;
     enVuelo.current = true;
     setEnviando(true);
 
-    const huella = JSON.stringify({ naturaleza, items: items ?? null });
+    const huella = JSON.stringify({ naturaleza, items: items ?? null, reponerStock });
     if (intento.current?.huella !== huella) intento.current = { huella, clave: nuevaClave() };
     const claveIdempotencia = intento.current.clave;
-    const cuerpo = items ? { naturaleza, items, claveIdempotencia } : { naturaleza, claveIdempotencia };
+    const cuerpo = items
+      ? { naturaleza, items, claveIdempotencia }
+      : { naturaleza, reponerStock, claveIdempotencia };
 
     let final: ResultadoNota;
     try {
@@ -189,13 +196,52 @@ function NotaForm({
   original: ComprobanteDetalle;
   naturaleza: Naturaleza;
   enviando: boolean;
-  enviar: (items: ItemEntrada[] | undefined) => Promise<ResultadoNota | null>;
+  enviar: (items: ItemEntrada[] | undefined, reponerStock: boolean) => Promise<ResultadoNota | null>;
   onCancelar: () => void;
 }) {
   const esCredito = naturaleza === "credito";
   const [modo, setModo] = useState<"total" | "parcial">("total");
   const [items, setItems] = useState<ItemFormulario[]>(() => [itemVacio()]);
   const [resultado, setResultado] = useState<ResultadoNota | null>(null);
+  // Sin valor por defecto: en una anulación total con stock por reponer hay que
+  // elegir a propósito.
+  const [reponer, setReponer] = useState<"si" | "no" | null>(null);
+  // Lo que se mandó en el último envío: un reintento tras un fallo incierto lo
+  // repite tal cual.
+  const reponerEnviado = useRef(false);
+  const [intentoStock, setIntentoStock] = useState(0);
+  const [cargaStock, setCargaStock] = useState<{
+    intento: number;
+    stock: StockComprobante | null;
+    error: ErrorApi | null;
+  } | null>(null);
+
+  // El stock del original se pide una vez por apertura (y al reintentar), solo
+  // para notas de crédito: es lo que decide si hay algo que reponer.
+  useEffect(() => {
+    if (!esCredito) return;
+    let activo = true;
+    obtenerStockComprobante(original.id)
+      .then((stock) => {
+        if (activo) setCargaStock({ intento: intentoStock, stock, error: null });
+      })
+      .catch((err: unknown) => {
+        if (activo) {
+          setCargaStock({
+            intento: intentoStock,
+            stock: null,
+            error: err instanceof ErrorApi ? err : new ErrorApi(0, "No se pudo consultar el stock."),
+          });
+        }
+      });
+    return () => {
+      activo = false;
+    };
+  }, [esCredito, original.id, intentoStock]);
+
+  const cargandoStock = esCredito && (cargaStock === null || cargaStock.intento !== intentoStock);
+  const stock = !cargandoStock ? (cargaStock?.stock ?? null) : null;
+  const errorStock = !cargandoStock ? (cargaStock?.error ?? null) : null;
 
   const total = esCredito && modo === "total";
   // Descarta productoPrecioId: las notas no lo usan (el backend también lo
@@ -222,16 +268,27 @@ function NotaForm({
   });
   // Solo se emite con una vista previa al día y sin error: lo que se ve es lo
   // que el backend va a calcular.
-  const puedeEmitir = total || (itemsNota !== undefined && calculo !== null);
-
   // Tras un fallo incierto el formulario queda congelado (ver NotaDialog).
   const congelado = resultado?.tipo === "error" && esIncierto(resultado.error);
+
+  // Solo se pregunta si hay algo que reponer: un descuento aplicado con
+  // movimientos, o uno pendiente. "no" y "cancelado" mandan false sin preguntar.
+  // Congelado no se reevalúa: el reintento con la misma clave tiene que mandar
+  // exactamente lo que ya se envió (`reponerEnviado`).
+  const preguntaStock =
+    total && !congelado && stock !== null && ((stock.estado === "aplicado" && stock.movimientos.length > 0) || stock.estado === "pendiente");
+  const puedeEmitir =
+    total
+      ? congelado || (!cargandoStock && (errorStock !== null || !preguntaStock || reponer !== null))
+      : itemsNota !== undefined && calculo !== null;
 
   async function emitir() {
     if (!puedeEmitir) return;
     setResultado(null);
     // Anulación total: `items` se omite (undefined), nunca se manda [].
-    const r = await enviar(total ? undefined : itemsNota);
+    const reponerStock = congelado ? reponerEnviado.current : total && preguntaStock && reponer === "si";
+    reponerEnviado.current = reponerStock;
+    const r = await enviar(total ? undefined : itemsNota, reponerStock);
     // null: había otro envío en curso, el que corresponde mostrar es el suyo.
     if (r && r.tipo !== "autorizado") setResultado(r);
   }
@@ -331,6 +388,7 @@ function NotaForm({
           <ItemsEditor
             items={items}
             onChange={setItems}
+            permitirStock={false}
             preciosIncluyenIva={original.preciosIncluyenIva}
             disabled={bloqueado || congelado}
           />
@@ -348,6 +406,77 @@ function NotaForm({
             </p>
           )}
         </div>
+      )}
+
+      {total && cargandoStock && (
+        <p role="status" className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2Icon className="size-4 animate-spin" />
+          Consultando el stock de la factura…
+        </p>
+      )}
+      {total && errorStock && (
+        <div role="alert" className={`${CAJA} ${ROJO}`}>
+          <p className="font-medium">No pudimos consultar el stock de la factura: {errorStock.error}</p>
+          <p className="mt-1">
+            Podés reintentar, o emitir la anulación igual: en ese caso <strong>no se repone stock</strong>.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={() => setIntentoStock((n) => n + 1)}
+            disabled={bloqueado || congelado}
+          >
+            Reintentar
+          </Button>
+        </div>
+      )}
+      {preguntaStock && stock && (
+        <fieldset className="flex flex-col gap-2 text-sm" disabled={bloqueado || congelado}>
+          <legend className="mb-1 font-medium text-zinc-900 dark:text-zinc-100">¿Reponer al stock?</legend>
+          {stock.estado === "aplicado" ? (
+            <>
+              <p className="text-zinc-700 dark:text-zinc-300">Si reponés, estos artículos vuelven al stock:</p>
+              <ul className="list-disc pl-5 text-zinc-700 dark:text-zinc-300">
+                {stock.movimientos.map((m) => (
+                  <li key={m.articuloId}>
+                    {m.marca} {m.codigo} – {m.descripcion}:{" "}
+                    <strong className="tabular-nums">{formatoCantidad.format(m.cantidad)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-zinc-700 dark:text-zinc-300">
+              El descuento de stock de esta factura todavía no se aplicó. Si elegís reponer, el stock queda como estaba.
+              Si elegís no reponer, el descuento pendiente se aplica igual más adelante y la mercadería cuenta como
+              vendida.
+            </p>
+          )}
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="radio"
+              name="reponer-stock"
+              checked={reponer === "si"}
+              onChange={() => setReponer("si")}
+              className="mt-0.5"
+            />
+            <span>Reponer al stock</span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="radio"
+              name="reponer-stock"
+              checked={reponer === "no"}
+              onChange={() => setReponer("no")}
+              className="mt-0.5"
+            />
+            <span>No reponer</span>
+          </label>
+          {reponer === null && (
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">Elegí una opción para poder emitir la anulación.</p>
+          )}
+        </fieldset>
       )}
 
       <p className="text-xs text-zinc-600 dark:text-zinc-400">

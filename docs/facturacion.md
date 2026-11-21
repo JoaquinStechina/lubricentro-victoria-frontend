@@ -40,8 +40,9 @@ Para una venta que **ya se facturó por otro medio** (por ejemplo en Comprobante
 ## Notas de crédito y débito (`NotaDialog`)
 
 - **Anulación total.** Se manda **sin** `items`.
-- **Nota parcial.** Los importes salen de la previsualización del backend.
-- **Clave de idempotencia.** Se guarda junto con una huella del pedido (naturaleza más ítems) y sobrevive al cierre del diálogo.
+- **Nota parcial.** Los importes salen de la previsualización del backend. Nunca repone stock.
+- **«¿Reponer al stock?».** Solo en la anulación total: pide `GET .../stock` del original. Con descuento aplicado muestra los artículos que vuelven; con descuento pendiente avisa que todavía no se aplicó: si se repone, el stock queda como estaba; si no, el descuento pendiente se aplica igual más adelante y la mercadería cuenta como vendida. En ambos casos hay que elegir «Reponer al stock» o «No reponer» (sin opción por defecto) para habilitar «Emitir». Con stock `no` o `cancelado` no pregunta y manda `reponerStock: false`. Si la consulta falla, avisa y permite reintentar o emitir sin reponer (`reponerStock: false`): el stock nunca bloquea una anulación.
+- **Clave de idempotencia.** Se guarda junto con una huella del pedido (naturaleza, ítems y `reponerStock`) y sobrevive al cierre del diálogo.
 - **Fallo incierto.** Tras un fallo incierto (sin respuesta o 5xx), el formulario **se congela**: solo se puede reintentar con la misma clave o cerrar. Editarlo crearía una clave nueva y podría duplicar la nota.
 - **Error `503`.** Significa que ARCA no está configurada. Es un fracaso definitivo, no una duda: el backend responde antes de crear nada.
 
@@ -49,3 +50,16 @@ Para una venta que **ya se facturó por otro medio** (por ejemplo en Comprobante
 
 - **Cuándo aparece.** Un comprobante `pendiente` muestra «Reconciliar» (`POST .../reconciliar`). Mientras siga pendiente, la numeración de ese tipo queda bloqueada en el backend.
 - **Error `409`.** Significa que el comprobante ya no está pendiente: la pantalla refresca la fila.
+
+## Stock al facturar y al anular
+
+- **Precio sugerido.** Al cargar un ítem de una venta oficial se sugiere el precio del catálogo («Precio sugerido del catálogo»).
+- **«Agregar desde stock».** El editor de ítems busca artículos del stock y vincula el ítem al artículo. Las notas parciales no vinculan. Un ítem del catálogo se vincula solo si su código coincide con un único artículo; si esa búsqueda vuelve con el editor ya bloqueado (la venta se guardó o se está guardando), no se vincula.
+- **«¿Descontar del stock?».** Al facturar, un diálogo muestra la vista previa (`GET /api/ventas/:id/stock`: qué se descuenta, cuánto quedaría y qué se omite y por qué) y manda `descontarStock` con «Facturar y descontar» o «Facturar sin descontar». Las ventas externas nunca mueven stock.
+  - **Nueva venta** («Guardar y facturar» y «Facturar ahora») pide la vista previa antes: si no hay nada para descontar, factura directo con `descontarStock: false`, sin diálogo. El diálogo se abre solo si hay algo para descontar o si la consulta falla (avisa y ofrece «Reintentar» o «Facturar sin descontar»).
+  - **El listado de Ventas** siempre abre el diálogo: sin nada para descontar, es la confirmación de «Facturar».
+- **Sección «Stock» del comprobante** (facturas y NC; las notas de débito no la tienen). Estados de `GET .../stock`:
+  - `aplicado`: «Stock descontado el …» (factura) o «Stock repuesto el …» (NC), con los movimientos. Si no hubo ninguno, lo dice («Sin movimientos: …»).
+  - `no`: «No se descontó stock» o «No se repuso stock».
+  - `pendiente`: «Descuento de stock pendiente» (factura) o «Reposición de stock pendiente» (NC). Con el comprobante autorizado aparece «Aplicar ahora» (`POST .../stock`; un `409` refresca); si sigue pendiente con ARCA, se aplica solo al autorizarse.
+  - `cancelado`: «Descuento de stock cancelado por la anulación» (su fecha es la de la anulación y no se muestra).
