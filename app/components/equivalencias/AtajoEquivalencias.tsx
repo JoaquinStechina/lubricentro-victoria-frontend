@@ -123,6 +123,12 @@ export default function AtajoEquivalencias() {
               Ningún producto del catálogo tiene el código {consulta}
             </p>
           )}
+          {/* Sin esto, un código sin equivalencias deja la ventana en blanco, igual que si todavía buscara. */}
+          {vigente && vigente.equivalencias.length === 0 && (
+            <p className="px-3 py-2 text-sm text-muted-foreground">
+              Sin equivalencias para {consulta}
+            </p>
+          )}
           {vigente && vigente.equivalencias.length > 0 && (
             <CommandGroup heading={`EQUIVALENCIAS DE ${consulta}`}>
               {vigente.equivalencias.map((r) => (
