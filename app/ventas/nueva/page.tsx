@@ -354,6 +354,8 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
           onOpenChange={setFacturarOpen}
           onConfirmar={(descontar) => ventaGuardada && facturarConDecision(ventaGuardada.id, descontar)}
           ocupado={emitiendoId !== null}
+          cliente={cliente?.nombre}
+          total={calculo?.impTotal}
         />
       </main>
     </div>

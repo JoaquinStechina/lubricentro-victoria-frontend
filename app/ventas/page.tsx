@@ -371,6 +371,8 @@ export default function VentasPage() {
           onOpenChange={setFacturarOpen}
           onConfirmar={(descontar) => aFacturar && void facturar(aFacturar.id, descontar)}
           ocupado={emitiendoId !== null}
+          cliente={aFacturar?.cliente?.nombre}
+          total={aFacturar?.impTotal}
         />
         <EliminarVentaDialog
           venta={aEliminar}

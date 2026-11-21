@@ -5,6 +5,7 @@ import { AlertTriangleIcon, Loader2Icon } from "lucide-react";
 import { AMBAR, CAJA, ROJO } from "@/app/components/facturacion/estilos";
 import {
   ErrorApi,
+  formatearMoneda,
   MOTIVO_OMITIDO,
   obtenerVistaPreviaStock,
   type OmitidoStock,
@@ -31,12 +32,18 @@ export default function FacturarDialog({
   onOpenChange,
   onConfirmar,
   ocupado,
+  cliente,
+  total,
 }: {
   ventaId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirmar: (descontarStock: boolean) => void;
   ocupado: boolean;
+  /** A quién se emite: nombre del cliente (sin cliente: Consumidor Final). */
+  cliente?: string | null;
+  /** Importe total del comprobante, si se conoce. */
+  total?: number | null;
 }) {
   const [carga, setCarga] = useState<Carga | null>(null);
   // Cambia para repetir la consulta ("Reintentar").
@@ -71,6 +78,11 @@ export default function FacturarDialog({
   const vista = actual?.vista ?? null;
   const hayDescontables = vista !== null && vista.descontables.length > 0;
 
+  // Facturar no se deshace: en todos los estados se dice a quién y por cuánto.
+  const destino = `Se emite el comprobante a ${cliente ?? "Consumidor Final"}${
+    total != null ? ` por ${formatearMoneda(total)}` : ""
+  }.`;
+
   function confirmar(descontar: boolean) {
     onOpenChange(false);
     onConfirmar(descontar);
@@ -83,8 +95,8 @@ export default function FacturarDialog({
           <DialogTitle>{hayDescontables ? "¿Descontar del stock?" : `¿Facturar la venta #${ventaId}?`}</DialogTitle>
           <DialogDescription>
             {hayDescontables
-              ? "Se emite el comprobante. Elegí si los artículos de la venta salen del stock."
-              : "Se emite el comprobante. Una factura autorizada no se puede editar ni borrar: para corregirla hay que emitir una nota de crédito."}
+              ? `${destino} Elegí si los artículos de la venta salen del stock.`
+              : `${destino} Una factura autorizada no se puede editar ni borrar: para corregirla hay que emitir una nota de crédito.`}
           </DialogDescription>
         </DialogHeader>
 
