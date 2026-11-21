@@ -248,6 +248,8 @@ export type ItemEntrada = {
   precioUnitario: number;
   alicuotaIva: number;
   productoPrecioId?: number | null;
+  /** Artículo de stock vinculado (solo la venta del sistema; las externas lo ignoran). */
+  articuloStockId?: number | null;
 };
 
 export type LineaCalculada = { neto: number; iva: number; total: number };
@@ -525,4 +527,35 @@ export type NuevaVentaExterna = {
 
 export function registrarVentaExterna(body: NuevaVentaExterna): Promise<RespuestaApi<VentaDetalle>> {
   return fetchFacturacion<VentaDetalle>("/api/ventas/externas", jsonInit(body, "POST"));
+}
+
+// Artículo de stock ofrecido para una venta (GET /api/stock/para-venta).
+export type ArticuloParaVenta = {
+  id: number;
+  marca: string;
+  codigo: string;
+  descripcion: string;
+  cantidad: number;
+  /** Precio final con IVA sugerido por el catálogo; null si no hay. */
+  precioSugerido: number | null;
+};
+
+// Artículo de stock vinculado a un ítem de la venta.
+export type ArticuloVinculado = { id: number; marca: string; codigo: string; cantidad: number };
+
+export async function buscarArticulosParaVenta(search: string): Promise<ArticuloParaVenta[]> {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  const res = await fetchFacturacion<{ items: ArticuloParaVenta[] }>(`/api/stock/para-venta?${params.toString()}`);
+  return res.data.items;
+}
+
+// El artículo cuyo código coincide exactamente, o null si no hay uno solo.
+export async function articuloPorCodigo(codigo: string): Promise<ArticuloVinculado | null> {
+  const params = new URLSearchParams({ codigo });
+  const res = await fetchFacturacion<{ articulo: (ArticuloVinculado & { descripcion?: string }) | null }>(
+    `/api/stock/por-codigo?${params.toString()}`,
+  );
+  const a = res.data.articulo;
+  return a ? { id: a.id, marca: a.marca, codigo: a.codigo, cantidad: a.cantidad } : null;
 }

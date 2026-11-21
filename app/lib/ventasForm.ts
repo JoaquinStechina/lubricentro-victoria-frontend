@@ -5,7 +5,7 @@
 // silencio. Esta capa NUNCA calcula importes: solo valida que lo tipeado sea
 // un número aceptable para el backend; los totales salen de la vista previa.
 
-import type { ItemEntrada } from "@/app/lib/facturacion";
+import type { ArticuloVinculado, ItemEntrada } from "@/app/lib/facturacion";
 
 // Topes del backend (routes/validar.ts y routes/ventasEntrada.ts). Se validan
 // acá solo para dar el mensaje al lado del campo; el backend los vuelve a
@@ -42,6 +42,8 @@ export type ItemFormulario = {
   origenPrecio: OrigenPrecio | null;
   /** Avisos de la precarga que no cambian con la tilde de IVA (moneda, alícuota ajustada, sin precio). */
   avisosCatalogo: string[];
+  /** Artículo de stock vinculado: al facturar se puede descontar de ahí. */
+  articuloStock: ArticuloVinculado | null;
 };
 
 // randomUUID solo existe en contextos seguros (https o localhost). Si la app se
@@ -69,6 +71,7 @@ export function itemVacio(): ItemFormulario {
     productoPrecioId: null,
     origenPrecio: null,
     avisosCatalogo: [],
+    articuloStock: null,
   };
 }
 
@@ -218,6 +221,7 @@ export function itemsParaGuardar(items: ItemFormulario[]): ItemEntrada[] | null 
       precioUnitario: e.precioUnitario,
       alicuotaIva: Number(item.alicuotaIva),
       productoPrecioId: item.productoPrecioId,
+      articuloStockId: item.articuloStock?.id ?? null,
     });
   }
   return salida;

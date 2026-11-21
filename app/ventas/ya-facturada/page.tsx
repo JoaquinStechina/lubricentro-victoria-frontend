@@ -343,6 +343,7 @@ function RegistrarVentaYaFacturada({ onOtra }: { onOtra: () => void }) {
             <ItemsEditor
               items={items}
               onChange={setItems}
+              permitirStock={false}
               preciosIncluyenIva={preciosIncluyenIva}
               importes={previewAlDia && calculo && calculo.lineas.length === items.length ? calculo.lineas.map((l) => l.total) : null}
             />
