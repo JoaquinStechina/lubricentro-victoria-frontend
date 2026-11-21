@@ -108,7 +108,7 @@ export default function ProductoCatalogoPicker({
           <CommandList>
             <CommandGroup>
               {items.map((p) => {
-                const { precio, origen } = precioDe(p);
+                const { precio } = precioDe(p);
                 return (
                   <CommandItem key={p.id} value={String(p.id)} onSelect={() => elegir(p)}>
                     <span className="flex w-full items-center justify-between gap-3">
