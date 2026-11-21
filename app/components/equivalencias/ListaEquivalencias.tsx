@@ -61,7 +61,7 @@ export default function ListaEquivalencias({
                     {producto.precioSugerido !== null && ` · ${formatearMoneda(producto.precioSugerido)}`}
                   </span>
                 )}
-                {!sinProductos &&
+                {(r.stock !== null || !sinProductos) &&
                   (r.stock !== null && r.stock > 0 ? (
                     <span className="text-sm text-emerald-600 dark:text-emerald-400">stock {r.stock}</span>
                   ) : (
