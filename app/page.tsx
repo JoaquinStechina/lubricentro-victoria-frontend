@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { PackageIcon, ReceiptIcon, UploadCloudIcon } from "lucide-react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ArrowLeftRightIcon, PackageIcon, ReceiptIcon, UploadCloudIcon } from "lucide-react";
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -11,8 +12,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Tab = "catalogo" | "ofertas";
 
+// Identifica cada llegada con `?search=`. La ventana Ctrl + K agrega `?k=`, un
+// número nuevo en cada Enter: elegir el mismo código otra vez también cuenta
+// como llegada (si no, la URL no cambia y no pasa nada). `k` nunca llega al
+// buscador, y un enlace con solo `?search=` sigue andando.
+function llegadaConBusqueda(params: URLSearchParams): string | null {
+  const search = params.get("search");
+  return search ? `${search}|${params.get("k") ?? ""}` : null;
+}
+
+// Lee `?search=` (lo usan los enlaces a un código). Va aparte para que el
+// Suspense que pide useSearchParams no cubra toda la página.
+function CatalogoConBusqueda() {
+  const params = useSearchParams();
+  const search = params.get("search") ?? undefined;
+  // La key remonta la vista en cada llegada (p. ej. Enter en la ventana Ctrl + K estando en el Catálogo).
+  return <CatalogoView key={llegadaConBusqueda(params) ?? ""} searchInicial={search} />;
+}
+
+// En cada llegada con ?search= (p. ej. Enter en la ventana Ctrl + K) pasa a la pestaña Catálogo.
+function CambiarACatalogoConBusqueda({ onBusqueda }: { onBusqueda: () => void }) {
+  const llegada = llegadaConBusqueda(useSearchParams());
+  useEffect(() => {
+    if (llegada) onBusqueda();
+  }, [llegada, onBusqueda]);
+  return null;
+}
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("catalogo");
+  const irACatalogo = useCallback(() => setTab("catalogo"), []);
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-black">
@@ -28,6 +57,12 @@ export default function Home() {
               <Button variant="outline">
                 <UploadCloudIcon />
                 Cargar archivo
+              </Button>
+            </Link>
+            <Link href="/equivalencias">
+              <Button variant="outline">
+                <ArrowLeftRightIcon />
+                Equivalencias
               </Button>
             </Link>
             <Link href="/stock">
@@ -46,6 +81,10 @@ export default function Home() {
           </div>
         </header>
 
+        <Suspense fallback={null}>
+          <CambiarACatalogoConBusqueda onBusqueda={irACatalogo} />
+        </Suspense>
+
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
           <TabsList className="mb-6">
             <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
@@ -53,7 +92,11 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value="catalogo">
-            {tab === "catalogo" && <CatalogoView />}
+            {tab === "catalogo" && (
+              <Suspense fallback={null}>
+                <CatalogoConBusqueda />
+              </Suspense>
+            )}
           </TabsContent>
           <TabsContent value="ofertas">
             {tab === "ofertas" && <OfertasView />}

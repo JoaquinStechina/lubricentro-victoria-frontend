@@ -39,6 +39,10 @@ Otros helpers:
   - `HighlightText.tsx`;
   - `ExportarButton.tsx`.
 - **`HistorialChart.tsx`:** gráfico de línea en SVG propio, sin librería de charts.
+- **Equivalencias (`app/components/equivalencias/`, cliente en `app/lib/equivalencias.ts`):**
+  - `ListaEquivalencias.tsx`: lista compartida por el Catálogo, la ventana Ctrl + K y `/equivalencias`;
+  - `SeccionEquivalencias.tsx`: sección bajo la tabla del Catálogo, con debounce y descarte de respuestas viejas;
+  - `AtajoEquivalencias.tsx`: ventana Ctrl + K, montada en `app/layout.tsx`.
 - **`components/ui/`:** componentes de shadcn sobre Base UI. Íconos con `lucide-react`.
 - **Tema claro/oscuro:** `ThemeProvider.tsx` y `ThemeToggle.tsx`. La preferencia se guarda en `localStorage`.
 
