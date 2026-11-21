@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PackageIcon, ReceiptIcon, UploadCloudIcon } from "lucide-react";
+import { ArrowLeftRightIcon, PackageIcon, ReceiptIcon, UploadCloudIcon } from "lucide-react";
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
 import ThemeToggle from "@/app/components/ThemeToggle";
@@ -47,6 +47,12 @@ export default function Home() {
               <Button variant="outline">
                 <UploadCloudIcon />
                 Cargar archivo
+              </Button>
+            </Link>
+            <Link href="/equivalencias">
+              <Button variant="outline">
+                <ArrowLeftRightIcon />
+                Equivalencias
               </Button>
             </Link>
             <Link href="/stock">

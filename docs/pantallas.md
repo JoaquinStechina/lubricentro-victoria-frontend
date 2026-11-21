@@ -7,6 +7,7 @@
 | `/cargas/[id]` | Revisión de una carga antes de publicarla. | `/api/uploads/:id`, `/advertencias`, `/confirmar` |
 | `/cargas/gestion` | Precio vigente por SKU y ofertas activas; cerrar o reactivar. | `/api/productos`, `/api/ofertas/cerrar\|reactivar` |
 | `/cargas/auto-descargas` | ABM de las marcas que se descargan solas y «Probar ahora». | `/api/auto-descargas*` |
+| `/equivalencias` | Estado y recálculo de la tabla de equivalencias, búsqueda, alta a mano y descartes. | `/api/equivalencias*` |
 | `/stock` | Artículos, Movimientos y Reposición, en pestañas. | `/api/stock*` |
 | `/ventas`, `/ventas/nueva` | Ventas y alta de venta. Desde acá se factura. | `/api/ventas*`, `/api/facturacion/comprobantes` |
 | `/ventas/ya-facturada` | Registrar una venta que ya se facturó por otro medio. **Nunca va a ARCA.** | `/api/ventas/externas`, `/api/ventas/previsualizar` |
@@ -38,6 +39,12 @@ Las pantallas de facturación comparten `FacturacionNav` (Comprobantes, Ventas, 
   - «Ver cerradas/vencidas»;
   - «Marcar agotada» y «Reactivar». Cierran **todos los tramos** del SKU en esa oferta.
 
+- **Equivalencias.** Bajo la tabla, si lo buscado parece un código (3 caracteres o más y un dígito), aparece «EQUIVALENCIAS DE <código>». Cada fila muestra marca, código, producto, precio, stock y «Por qué». «vía <marca> <código>» indica un salto intermedio y «posible», una confianza media. Un clic en el código lo busca en el Catálogo.
+
+## Ctrl + K (en cualquier pantalla)
+
+Ventana de búsqueda rápida para el mostrador (`AtajoEquivalencias.tsx`, montada en el layout). Busca el código y lista sus equivalencias, con «Descartar» por fila. El pie lleva a `/equivalencias?agregar=<código>` para agregar una a mano.
+
 ## Cargas (`/cargas`, `/cargas/[id]`)
 
 - **Subida (`UploadForm.tsx`).** Recibe excel, PDF o imagen, con proveedor y tipo (Catálogo u Oferta). Para ofertas, el switch «Hasta agotar stock» manda `sinFechaLimite`.
@@ -57,3 +64,15 @@ ABM con proveedor, marca, % de ganancia y un switch de activo. «Probar ahora» 
 - **Artículos.** Tabla con filtros, papelera, alta, edición, movimiento (entrada, salida o ajuste) e historial.
 - **Movimientos.** Historial de todos los artículos, con filtros.
 - **Reposición.** Artículos en el mínimo o por debajo, con el proveedor más barato del catálogo.
+
+## Equivalencias (`/equivalencias`)
+
+Se entra con el botón «Equivalencias» del encabezado del Catálogo.
+
+- **Estado.** «Actualizada hace N min · X equivalencias», el último error si hubo y «Recalcular ahora» (queda deshabilitado mientras el backend reconstruye la tabla).
+- **Buscar.** Misma lista que el Catálogo, con «Descartar» por fila: el par deja de mostrarse y el recálculo no lo trae de vuelta.
+- **Agregar equivalencia.** Marca + código ≡ marca + código. Con `?agregar=` llega el código A prellenado.
+- **Agregadas a mano.** Tabla con «Borrar».
+- **Descartadas.** Tabla con «Restaurar».
+
+Los errores se muestran con el mensaje del backend.
