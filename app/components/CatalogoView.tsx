@@ -21,6 +21,7 @@ import ColumnVisibilityMenu, { type ColumnOption } from "@/app/components/Column
 import ExportarButton from "@/app/components/ExportarButton";
 import HighlightText from "@/app/components/HighlightText";
 import SortableResizableHead from "@/app/components/SortableResizableHead";
+import SeccionEquivalencias from "@/app/components/equivalencias/SeccionEquivalencias";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import EditarProductoDialog from "@/app/components/catalogo/EditarProductoDialog";
 import NuevoProductoDialog from "@/app/components/catalogo/NuevoProductoDialog";
@@ -129,8 +130,9 @@ function formatPorcentaje(valor: number | null) {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(valor);
 }
 
-export default function CatalogoView() {
+export default function CatalogoView({ searchInicial }: { searchInicial?: string } = {}) {
   const tabla = useTablaRecurso({
+    searchInicial,
     filtrosIniciales: EMPTY_COLUMN_FILTERS,
     pageSizeInicial: PAGE_SIZES[0],
   });
@@ -847,6 +849,8 @@ export default function CatalogoView() {
         </Table>
       </div>
       </DndContext>
+
+      <SeccionEquivalencias q={tabla.search} onElegir={tabla.setSearch} />
 
       <TablePaginationBar
         loading={loading}

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PackageIcon, ReceiptIcon, UploadCloudIcon } from "lucide-react";
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
@@ -10,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Tab = "catalogo" | "ofertas";
+
+// Lee `?search=` (lo usan los enlaces a un código). Va aparte para que el
+// Suspense que pide useSearchParams no cubra toda la página.
+function CatalogoConBusqueda() {
+  const search = useSearchParams().get("search") ?? undefined;
+  return <CatalogoView searchInicial={search} />;
+}
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("catalogo");
@@ -53,7 +61,11 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value="catalogo">
-            {tab === "catalogo" && <CatalogoView />}
+            {tab === "catalogo" && (
+              <Suspense fallback={null}>
+                <CatalogoConBusqueda />
+              </Suspense>
+            )}
           </TabsContent>
           <TabsContent value="ofertas">
             {tab === "ofertas" && <OfertasView />}

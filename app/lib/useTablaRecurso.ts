@@ -12,10 +12,12 @@ export type SortState = { campo: string; order: "asc" | "desc" } | null;
 export function useTablaRecurso<TFilters extends Record<string, string>>(opciones: {
   filtrosIniciales: TFilters;
   pageSizeInicial: number;
+  // Texto con el que arranca la búsqueda (ej. al llegar por `/?search=`).
+  searchInicial?: string;
 }) {
-  const { filtrosIniciales, pageSizeInicial } = opciones;
+  const { filtrosIniciales, pageSizeInicial, searchInicial = "" } = opciones;
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchInicial);
   const [columnFilters, setColumnFilters] = useState<TFilters>(filtrosIniciales);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(pageSizeInicial);
@@ -27,7 +29,7 @@ export function useTablaRecurso<TFilters extends Record<string, string>>(opcione
   const [reloadTick, setReloadTick] = useState(0);
 
   // Debounce de los campos de texto: sin esto se dispara un fetch por tecla.
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchInicial);
   const [debouncedColumnFilters, setDebouncedColumnFilters] = useState<TFilters>(filtrosIniciales);
   useEffect(() => {
     const id = setTimeout(() => {
