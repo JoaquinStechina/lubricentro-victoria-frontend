@@ -68,11 +68,10 @@ function esIncierto(error: ErrorApi): boolean {
 //
 // Idempotencia: la clave identifica una INTENCIÓN de emitir esta nota. Se
 // guarda en un ref junto con una huella del pedido (naturaleza + ítems + si
-// repone stock) y se
-// REUTILIZA mientras el backend no haya respondido con un comprobante (error
-// de red, timeout, 5xx, doble clic, incluso cerrando y reabriendo el diálogo):
-// si el servidor sí procesó el pedido, repetir la clave devuelve esa nota en
-// vez de emitir otra. Si el usuario cambia lo que va a emitir, la huella
+// repone stock) y se REUTILIZA mientras el backend no haya respondido con un
+// comprobante (error de red, timeout, 5xx, doble clic, incluso cerrando y
+// reabriendo el diálogo): si el servidor sí procesó el pedido, repetir la
+// clave devuelve esa nota en vez de emitir otra. Si el usuario cambia lo que va a emitir, la huella
 // cambia y se usa una clave nueva. En cuanto el backend devuelve un
 // comprobante (de cualquier estado) la intención terminó y la clave se
 // descarta. El ref vive en este componente (no en el formulario) para que
@@ -207,6 +206,9 @@ function NotaForm({
   // Sin valor por defecto: en una anulación total con stock por reponer hay que
   // elegir a propósito.
   const [reponer, setReponer] = useState<"si" | "no" | null>(null);
+  // Lo que se mandó en el último envío: un reintento tras un fallo incierto lo
+  // repite tal cual.
+  const reponerEnviado = useRef(false);
   const [intentoStock, setIntentoStock] = useState(0);
   const [cargaStock, setCargaStock] = useState<{
     intento: number;
@@ -266,23 +268,27 @@ function NotaForm({
   });
   // Solo se emite con una vista previa al día y sin error: lo que se ve es lo
   // que el backend va a calcular.
-  // Solo se pregunta si hay algo que reponer: un descuento aplicado con
-  // movimientos, o uno pendiente. "no" y "cancelado" mandan false sin preguntar.
-  const preguntaStock =
-    total && stock !== null && ((stock.estado === "aplicado" && stock.movimientos.length > 0) || stock.estado === "pendiente");
-  const puedeEmitir =
-    total
-      ? !cargandoStock && (errorStock !== null || !preguntaStock || reponer !== null)
-      : itemsNota !== undefined && calculo !== null;
-
   // Tras un fallo incierto el formulario queda congelado (ver NotaDialog).
   const congelado = resultado?.tipo === "error" && esIncierto(resultado.error);
+
+  // Solo se pregunta si hay algo que reponer: un descuento aplicado con
+  // movimientos, o uno pendiente. "no" y "cancelado" mandan false sin preguntar.
+  // Congelado no se reevalúa: el reintento con la misma clave tiene que mandar
+  // exactamente lo que ya se envió (`reponerEnviado`).
+  const preguntaStock =
+    total && !congelado && stock !== null && ((stock.estado === "aplicado" && stock.movimientos.length > 0) || stock.estado === "pendiente");
+  const puedeEmitir =
+    total
+      ? congelado || (!cargandoStock && (errorStock !== null || !preguntaStock || reponer !== null))
+      : itemsNota !== undefined && calculo !== null;
 
   async function emitir() {
     if (!puedeEmitir) return;
     setResultado(null);
     // Anulación total: `items` se omite (undefined), nunca se manda [].
-    const r = await enviar(total ? undefined : itemsNota, total && preguntaStock && reponer === "si");
+    const reponerStock = congelado ? reponerEnviado.current : total && preguntaStock && reponer === "si";
+    reponerEnviado.current = reponerStock;
+    const r = await enviar(total ? undefined : itemsNota, reponerStock);
     // null: había otro envío en curso, el que corresponde mostrar es el suyo.
     if (r && r.tipo !== "autorizado") setResultado(r);
   }
@@ -414,7 +420,13 @@ function NotaForm({
           <p className="mt-1">
             Podés reintentar, o emitir la anulación igual: en ese caso <strong>no se repone stock</strong>.
           </p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => setIntentoStock((n) => n + 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={() => setIntentoStock((n) => n + 1)}
+            disabled={bloqueado || congelado}
+          >
             Reintentar
           </Button>
         </div>

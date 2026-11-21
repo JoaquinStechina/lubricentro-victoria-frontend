@@ -504,10 +504,14 @@ function SeccionStock({ comprobante: c }: { comprobante: ComprobanteDetalle }) {
     let activo = true;
     obtenerStockComprobante(c.id)
       .then((stock) => {
-        if (activo) setCarga({ clave, stock, error: null });
+        if (activo) {
+          setErrorAplicar(null);
+          setCarga({ clave, stock, error: null });
+        }
       })
       .catch((err: unknown) => {
         if (activo) {
+          setErrorAplicar(null);
           setCarga({
             clave,
             stock: null,
@@ -548,7 +552,7 @@ function SeccionStock({ comprobante: c }: { comprobante: ComprobanteDetalle }) {
   return (
     <section className={TARJETA}>
       <h2 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">Stock</h2>
-      {cargando && carga === null && (
+      {cargando && (
         <p role="status" className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
           <Loader2Icon className="size-4 animate-spin" />
           Consultando el stock…
