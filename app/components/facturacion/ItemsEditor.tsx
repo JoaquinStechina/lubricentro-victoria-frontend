@@ -76,11 +76,15 @@ export default function ItemsEditor({
 }) {
   const lleno = items.length >= MAX_ITEMS_VENTA;
   // El vínculo automático es asíncrono: al volver la respuesta hay que partir
-  // de los ítems de ese momento, no de los del render que lo pidió.
+  // de los ítems de ese momento, no de los del render que lo pidió. Y si para
+  // entonces el editor está bloqueado (la venta ya se guardó o se está
+  // guardando), no se vincula: mostraría un vínculo que la venta guardada no tiene.
   const itemsRef = useRef(items);
+  const disabledRef = useRef(disabled);
   useEffect(() => {
     itemsRef.current = items;
-  }, [items]);
+    disabledRef.current = disabled;
+  }, [items, disabled]);
 
   function cambiar(clave: string, cambios: Partial<ItemFormulario>) {
     // Si el usuario toca el precio, el origen del catálogo (chip) y el aviso
@@ -133,12 +137,12 @@ export default function ItemsEditor({
   }
 
   // Busca el artículo de stock con ese código y lo vincula al ítem `clave`,
-  // solo si el ítem sigue existiendo y no tiene vínculo. Si falla, el ítem
-  // queda sin vincular y no se avisa.
+  // solo si el editor sigue editable y el ítem sigue existiendo sin vínculo.
+  // Si falla, el ítem queda sin vincular y no se avisa.
   function vincularPorCodigo(clave: string, codigo: string) {
     articuloPorCodigo(codigo)
       .then((articulo) => {
-        if (!articulo) return;
+        if (!articulo || disabledRef.current) return;
         const actuales = itemsRef.current;
         const destino = actuales.find((i) => i.clave === clave);
         if (!destino || destino.articuloStock) return;

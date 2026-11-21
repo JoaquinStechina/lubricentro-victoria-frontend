@@ -305,6 +305,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
             <ItemsEditor
               items={items}
               onChange={setItems}
+              disabled={bloqueado || guardando}
               preciosIncluyenIva={preciosIncluyenIva}
               importes={previewAlDia && calculo && calculo.lineas.length === items.length ? calculo.lineas.map((l) => l.total) : null}
             />
