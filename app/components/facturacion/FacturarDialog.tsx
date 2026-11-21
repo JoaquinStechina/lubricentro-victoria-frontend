@@ -21,11 +21,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type Carga = { ventaId: number; intento: number; vista: VistaPreviaStock | null; error: string | null };
+/** Resultado de pedir la vista previa del stock: la vista o el error a mostrar. */
+export type ConsultaStock = { vista: VistaPreviaStock | null; error: string | null };
+
+/** Pide la vista previa (GET /api/ventas/:id/stock). Nunca lanza: un fallo vuelve como `error`. */
+export function consultarStock(ventaId: number): Promise<ConsultaStock> {
+  return obtenerVistaPreviaStock(ventaId).then(
+    (vista) => ({ vista, error: null }),
+    (err: unknown) => ({ vista: null, error: err instanceof ErrorApi ? err.message : "No se pudo calcular el stock." }),
+  );
+}
+
+type Carga = ConsultaStock & { ventaId: number; intento: number };
 
 // Confirmación de "facturar": pregunta si se descuentan del stock los ítems
-// vinculados a artículos. Emitir no se deshace, por eso siempre se confirma.
-// Al abrirse pide la vista previa (GET /api/ventas/:id/stock).
+// vinculados a artículos. Al abrirse pide la vista previa, salvo que quien lo
+// abre ya la tenga (`consultaInicial`): Nueva venta la pide antes y, si no hay
+// nada para descontar, factura sin abrir el diálogo; el listado de Ventas
+// siempre confirma.
 export default function FacturarDialog({
   ventaId,
   open,
@@ -34,6 +47,7 @@ export default function FacturarDialog({
   ocupado,
   cliente,
   total,
+  consultaInicial = null,
 }: {
   ventaId: number | null;
   open: boolean;
@@ -44,37 +58,33 @@ export default function FacturarDialog({
   cliente?: string | null;
   /** Importe total del comprobante, si se conoce. */
   total?: number | null;
+  /** Vista previa ya pedida para esta apertura: se muestra sin volver a pedirla, hasta «Reintentar». */
+  consultaInicial?: ConsultaStock | null;
 }) {
   const [carga, setCarga] = useState<Carga | null>(null);
   // Cambia para repetir la consulta ("Reintentar").
   const [intento, setIntento] = useState(0);
+  const usaInicial = consultaInicial !== null && intento === 0;
 
   useEffect(() => {
-    if (!open || ventaId === null) return;
+    if (!open || ventaId === null || usaInicial) return;
     let active = true;
-    obtenerVistaPreviaStock(ventaId)
-      .then((vista) => {
-        if (active) setCarga({ ventaId, intento, vista, error: null });
-      })
-      .catch((err: unknown) => {
-        if (active) {
-          setCarga({
-            ventaId,
-            intento,
-            vista: null,
-            error: err instanceof ErrorApi ? err.message : "No se pudo calcular el stock.",
-          });
-        }
-      });
+    void consultarStock(ventaId).then((consulta) => {
+      if (active) setCarga({ ventaId, intento, ...consulta });
+    });
     return () => {
       active = false;
       // Al cerrar se descarta lo cargado: el stock puede cambiar antes de volver a abrir.
       setCarga(null);
     };
-  }, [open, ventaId, intento]);
+  }, [open, ventaId, intento, usaInicial]);
 
   // Una respuesta de otra venta o de un intento anterior no cuenta: se espera.
-  const actual = carga !== null && carga.ventaId === ventaId && carga.intento === intento ? carga : null;
+  const actual: ConsultaStock | null = usaInicial
+    ? consultaInicial
+    : carga !== null && carga.ventaId === ventaId && carga.intento === intento
+      ? carga
+      : null;
   const vista = actual?.vista ?? null;
   const hayDescontables = vista !== null && vista.descontables.length > 0;
 

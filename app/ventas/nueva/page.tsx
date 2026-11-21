@@ -6,7 +6,7 @@ import { ArrowLeftIcon, CheckCircle2Icon, Loader2Icon, PlusIcon, TriangleAlertIc
 import ClientePicker from "@/app/components/facturacion/ClientePicker";
 import ClienteDialog from "@/app/components/facturacion/ClienteDialog";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
-import FacturarDialog from "@/app/components/facturacion/FacturarDialog";
+import FacturarDialog, { consultarStock, type ConsultaStock } from "@/app/components/facturacion/FacturarDialog";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ItemsEditor from "@/app/components/facturacion/ItemsEditor";
 import ResultadoEmisionPanel from "@/app/components/facturacion/ResultadoEmisionPanel";
@@ -53,7 +53,6 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
   // Ref además del estado: dos clics en el mismo tick leen `guardando` viejo.
   const enVueloRef = useRef(false);
   const { emitir, emitiendoId, resultado, limpiarResultado } = useEmitirFactura();
-  const [facturarOpen, setFacturarOpen] = useState(false);
   // Última decisión de descontar stock, para repetirla en "Reintentar".
   const descontarRef = useRef(false);
   function facturarConDecision(ventaId: number, descontarStock: boolean) {
@@ -61,10 +60,37 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
     void emitir(ventaId, descontarStock);
   }
 
+  // Antes de facturar se pide la vista previa del stock. Sin nada para
+  // descontar se factura directo, sin preguntar; si hay algo (o la consulta
+  // falla) se abre «¿Descontar del stock?» con lo ya consultado. Cada apertura
+  // remonta el diálogo (`n` como key) para que empiece sin reintentos viejos.
+  const [facturarOpen, setFacturarOpen] = useState(false);
+  const [aperturaFacturar, setAperturaFacturar] = useState<{ n: number; consulta: ConsultaStock } | null>(null);
+  const [consultandoStock, setConsultandoStock] = useState(false);
+  // Ref además del estado, como enVueloRef: dos clics en el mismo tick.
+  const consultandoRef = useRef(false);
+  async function pedirFacturar(ventaId: number) {
+    if (consultandoRef.current) return;
+    consultandoRef.current = true;
+    setConsultandoStock(true);
+    try {
+      const consulta = await consultarStock(ventaId);
+      if (consulta.vista !== null && consulta.vista.descontables.length === 0) {
+        facturarConDecision(ventaId, false);
+      } else {
+        setAperturaFacturar((a) => ({ n: (a?.n ?? 0) + 1, consulta }));
+        setFacturarOpen(true);
+      }
+    } finally {
+      consultandoRef.current = false;
+      setConsultandoStock(false);
+    }
+  }
+
   const bloqueado = ventaGuardada !== null;
   // Mientras se guarda o se factura, irse de la pantalla dejaría la operación
   // sin que nadie vea el resultado: los enlaces de la página se deshabilitan.
-  const ocupado = guardando || emitiendoId !== null;
+  const ocupado = guardando || consultandoStock || emitiendoId !== null;
 
   // ---- Vista previa (única fuente de totales: el backend) -----------------
   const { itemsPreview, previewAlDia, calculando, calculo, errorPreview, reintentar } = usePrevisualizacion({
@@ -123,8 +149,8 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
         venta = res.data;
         setVentaGuardada(venta);
       }
-      // Facturar pregunta antes si se descuenta del stock; si se cancela, la venta queda guardada.
-      if (facturar) setFacturarOpen(true);
+      // Si hay algo para descontar del stock se pregunta antes; si se cancela, la venta queda guardada.
+      if (facturar) void pedirFacturar(venta.id);
     } catch (err) {
       setErrorGuardar(err instanceof ErrorApi ? err : new ErrorApi(0, "No se pudo guardar la venta."));
     } finally {
@@ -182,8 +208,14 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
                   La factura quedó pendiente de confirmar con ARCA: no está sin facturar. Resolvela desde el aviso de abajo.
                 </p>
               )}
-              {!resultado && emitiendoId === null && (
+              {!resultado && emitiendoId === null && !consultandoStock && (
                 <p className="mt-1">Todavía no está facturada: podés facturarla ahora o hacerlo después desde Ventas.</p>
+              )}
+              {consultandoStock && emitiendoId === null && (
+                <p className="mt-1 flex items-center gap-2">
+                  <Loader2Icon className="size-4 animate-spin" />
+                  Revisando el stock de la venta…
+                </p>
               )}
               {emitiendoId !== null && !resultado && (
                 <p className="mt-1 flex items-center gap-2">
@@ -194,8 +226,8 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
               <div className="mt-3 flex flex-wrap gap-2">
                 {!resultado && (
                   <Button
-                    onClick={() => setFacturarOpen(true)}
-                    disabled={emitiendoId !== null || guardando}
+                    onClick={() => void pedirFacturar(ventaGuardada.id)}
+                    disabled={emitiendoId !== null || guardando || consultandoStock}
                   >
                     {emitiendoId !== null ? "Facturando…" : "Facturar ahora"}
                   </Button>
@@ -209,7 +241,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
                     Ver ventas
                   </Button>
                 )}
-                <Button variant="outline" onClick={onOtraVenta} disabled={emitiendoId !== null}>
+                <Button variant="outline" onClick={onOtraVenta} disabled={emitiendoId !== null || consultandoStock}>
                   <PlusIcon />
                   Cargar otra venta
                 </Button>
@@ -349,6 +381,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
           </aside>
         </div>
         <FacturarDialog
+          key={aperturaFacturar?.n ?? 0}
           ventaId={ventaGuardada?.id ?? null}
           open={facturarOpen && ventaGuardada !== null}
           onOpenChange={setFacturarOpen}
@@ -356,6 +389,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
           ocupado={emitiendoId !== null}
           cliente={cliente?.nombre}
           total={calculo?.impTotal}
+          consultaInicial={aperturaFacturar?.consulta ?? null}
         />
       </main>
     </div>
