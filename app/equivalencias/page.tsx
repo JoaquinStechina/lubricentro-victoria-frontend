@@ -38,25 +38,18 @@ function textoHace(iso: string): string {
   return `hace ${Math.round(h / 24)} días`;
 }
 
-function Estado() {
+function Estado({ version, onCambio }: { version: number; onCambio: () => void }) {
   const [estado, setEstado] = useState<EstadoEquivalencias | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recalculando, setRecalculando] = useState(false);
-
-  const cargar = useCallback(async () => {
-    try {
-      setEstado(await estadoEquivalencias());
-      setError(null);
-    } catch (e) {
-      setError(mensaje(e));
-    }
-  }, []);
 
   useEffect(() => {
     let vigente = true;
     estadoEquivalencias()
       .then((e) => {
-        if (vigente) setEstado(e);
+        if (!vigente) return;
+        setEstado(e);
+        setError(null);
       })
       .catch((e) => {
         if (vigente) setError(mensaje(e));
@@ -64,7 +57,7 @@ function Estado() {
     return () => {
       vigente = false;
     };
-  }, []);
+  }, [version]);
 
   async function recalcular() {
     setRecalculando(true);
@@ -75,7 +68,7 @@ function Estado() {
       setError(mensaje(e));
     } finally {
       setRecalculando(false);
-      await cargar();
+      onCambio();
     }
   }
 
@@ -102,10 +95,9 @@ function Estado() {
   );
 }
 
-function Buscador({ onCambio }: { onCambio: () => void }) {
+function Buscador({ version, onCambio }: { version: number; onCambio: () => void }) {
   const [q, setQ] = useState("");
   const [respuesta, setRespuesta] = useState<RespuestaBusqueda | null>(null);
-  const [version, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const consulta = q.trim();
   const buscable = esCodigoBuscable(consulta);
@@ -138,7 +130,6 @@ function Buscador({ onCambio }: { onCambio: () => void }) {
     } catch (e) {
       setError(mensaje(e));
     }
-    setVersion((v) => v + 1);
     onCambio();
   }
 
@@ -260,11 +251,10 @@ function TablaPares({
   );
 }
 
-function Listas({ version }: { version: number }) {
+function Listas({ version, onCambio }: { version: number; onCambio: () => void }) {
   const [manuales, setManuales] = useState<ParEquivalencia[]>([]);
   const [descartes, setDescartes] = useState<DescarteEquivalencia[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
     let vigente = true;
@@ -281,7 +271,7 @@ function Listas({ version }: { version: number }) {
     return () => {
       vigente = false;
     };
-  }, [version, recarga]);
+  }, [version]);
 
   async function accion(fn: () => Promise<void>) {
     try {
@@ -290,7 +280,7 @@ function Listas({ version }: { version: number }) {
     } catch (e) {
       setError(mensaje(e));
     }
-    setRecarga((n) => n + 1);
+    onCambio();
   }
 
   return (
@@ -331,7 +321,7 @@ function Listas({ version }: { version: number }) {
 }
 
 export default function EquivalenciasPage() {
-  // Se incrementa cuando el buscador o el formulario cambian las listas.
+  // Se incrementa ante cualquier cambio (descartar, agregar, borrar, restaurar, recalcular) y refresca estado, búsqueda y listas.
   const [version, setVersion] = useState(0);
   const cambio = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -354,12 +344,12 @@ export default function EquivalenciasPage() {
           <ThemeToggle />
         </header>
 
-        <Estado />
-        <Buscador onCambio={cambio} />
+        <Estado version={version} onCambio={cambio} />
+        <Buscador version={version} onCambio={cambio} />
         <Suspense fallback={null}>
           <AgregarConPrefill onCambio={cambio} />
         </Suspense>
-        <Listas version={version} />
+        <Listas version={version} onCambio={cambio} />
       </main>
     </div>
   );
