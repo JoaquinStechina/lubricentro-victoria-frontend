@@ -543,6 +543,42 @@ export async function obtenerVistaPreviaStock(ventaId: number): Promise<VistaPre
 }
 
 // ---------------------------------------------------------------------------
+// Stock de un comprobante (descuento al facturar, reposición al anular)
+// ---------------------------------------------------------------------------
+
+export type EstadoStockComprobante = "no" | "pendiente" | "aplicado" | "cancelado";
+
+export type MovimientoStockComprobante = {
+  articuloId: number;
+  marca: string;
+  codigo: string;
+  descripcion: string;
+  tipo: "salida" | "entrada";
+  /** Siempre positiva: el sentido lo da `tipo`. */
+  cantidad: number;
+};
+
+// GET y POST /api/facturacion/comprobantes/:id/stock. Con "cancelado",
+// `aplicadoEn` es el momento de la cancelación, no de un descuento.
+export type StockComprobante = {
+  estado: EstadoStockComprobante;
+  aplicadoEn: string | null;
+  movimientos: MovimientoStockComprobante[];
+};
+
+export async function obtenerStockComprobante(id: number): Promise<StockComprobante> {
+  const res = await fetchFacturacion<StockComprobante>(`/api/facturacion/comprobantes/${id}/stock`);
+  return res.data;
+}
+
+// Aplica un ajuste pendiente. 409 = no hay nada que aplicar (ya se aplicó,
+// se canceló o el comprobante todavía no está autorizado).
+export async function aplicarStockComprobante(id: number): Promise<StockComprobante> {
+  const res = await fetchFacturacion<StockComprobante>(`/api/facturacion/comprobantes/${id}/stock`, { method: "POST" });
+  return res.data;
+}
+
+// ---------------------------------------------------------------------------
 // Ventas ya facturadas por fuera
 // ---------------------------------------------------------------------------
 

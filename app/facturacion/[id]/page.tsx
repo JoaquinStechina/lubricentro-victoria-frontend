@@ -13,6 +13,7 @@ import { API_URL } from "@/app/lib/api";
 import {
   ErrorApi,
   admiteNotas,
+  aplicarStockComprobante,
   condicionIvaPorId,
   esAmbienteDePrueba,
   etiquetaAmbiente,
@@ -23,10 +24,12 @@ import {
   formatearFechaIso,
   formatearMoneda,
   formatearNroComprobante,
+  obtenerStockComprobante,
   textoObservaciones,
   varianteEstado,
   type ComprobanteConItems,
   type ComprobanteDetalle,
+  type StockComprobante,
 } from "@/app/lib/facturacion";
 import { etiquetaAlicuota } from "@/app/lib/ventasForm";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +37,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const formatoCantidad = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
+
+const formatoFechaHora = new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" });
 
 // El snapshot de items/iva es JSON guardado: si alguna fila trae algo que no
 // es lo esperado se muestra "—" en vez de "NaN" o "undefined %".
@@ -204,6 +209,8 @@ function Detalle({
   const fallido = c.estado === "rechazado" || c.estado === "error";
   const prueba = esAmbienteDePrueba(c.ambiente);
   const condicion = condicionIvaPorId(c.receptorCondicionIvaId);
+  // Facturas (1, 6) y notas de crédito (3, 8) mueven stock; las de débito no.
+  const ajustaStock = [1, 6, 3, 8].includes(c.tipo);
   const urlPdf = `${API_URL}/api/facturacion/comprobantes/${c.id}/pdf`;
 
   async function reconciliar() {
@@ -455,6 +462,8 @@ function Detalle({
         </dl>
       </section>
 
+      {ajustaStock && <SeccionStock comprobante={c} />}
+
       <ObservacionesArca observaciones={c.observaciones} />
 
       {c.notas.length > 0 && (
@@ -474,6 +483,132 @@ function Detalle({
         </section>
       )}
     </div>
+  );
+}
+
+// Estado del stock del comprobante: descuento (factura) o reposición (NC). Se
+// vuelve a pedir cuando cambia el comprobante (p. ej. una nota nueva cancela o
+// repone el stock).
+type CargaStock = { clave: string; stock: StockComprobante | null; error: ErrorApi | null };
+
+function SeccionStock({ comprobante: c }: { comprobante: ComprobanteDetalle }) {
+  const esNota = c.tipo === 3 || c.tipo === 8;
+  const [carga, setCarga] = useState<CargaStock | null>(null);
+  const [reintento, setReintento] = useState(0);
+  const [aplicando, setAplicando] = useState(false);
+  const [errorAplicar, setErrorAplicar] = useState<string | null>(null);
+  const enVuelo = useRef(false);
+  const clave = `${c.id}|${c.estado}|${c.updatedAt}|${c.notas.length}|${reintento}`;
+
+  useEffect(() => {
+    let activo = true;
+    obtenerStockComprobante(c.id)
+      .then((stock) => {
+        if (activo) setCarga({ clave, stock, error: null });
+      })
+      .catch((err: unknown) => {
+        if (activo) {
+          setCarga({
+            clave,
+            stock: null,
+            error: err instanceof ErrorApi ? err : new ErrorApi(0, "No se pudo consultar el stock."),
+          });
+        }
+      });
+    return () => {
+      activo = false;
+    };
+  }, [c.id, clave]);
+
+  async function aplicar() {
+    if (enVuelo.current) return;
+    enVuelo.current = true;
+    setAplicando(true);
+    setErrorAplicar(null);
+    try {
+      const stock = await aplicarStockComprobante(c.id);
+      setCarga({ clave, stock, error: null });
+    } catch (err) {
+      if (err instanceof ErrorApi && err.status === 409) {
+        // No había nada para aplicar (ya se aplicó o se canceló): se refresca.
+        setReintento((n) => n + 1);
+      } else {
+        setErrorAplicar(err instanceof ErrorApi ? err.error : "No se pudo aplicar el ajuste de stock.");
+      }
+    } finally {
+      enVuelo.current = false;
+      setAplicando(false);
+    }
+  }
+
+  const cargando = carga === null || carga.clave !== clave;
+  const stock = !cargando ? carga.stock : null;
+  const error = !cargando ? carga.error : null;
+
+  return (
+    <section className={TARJETA}>
+      <h2 className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">Stock</h2>
+      {cargando && carga === null && (
+        <p role="status" className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <Loader2Icon className="size-4 animate-spin" />
+          Consultando el stock…
+        </p>
+      )}
+      {error && (
+        <div className="flex flex-col items-start gap-2 text-sm">
+          <p role="alert" className="text-red-700 dark:text-red-400">
+            {error.error}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setReintento((n) => n + 1)}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+      {stock && (
+        <div className="flex flex-col gap-2 text-sm text-zinc-800 dark:text-zinc-200">
+          {stock.estado === "aplicado" && (
+            <p>
+              {esNota ? "Stock repuesto" : "Stock descontado"}
+              {stock.aplicadoEn ? ` el ${formatoFechaHora.format(new Date(stock.aplicadoEn))}` : ""}
+            </p>
+          )}
+          {stock.estado === "no" && <p>{esNota ? "No se repuso stock" : "No se descontó stock"}</p>}
+          {stock.estado === "cancelado" && <p>Descuento de stock cancelado por la anulación</p>}
+          {stock.estado === "pendiente" && (
+            <>
+              <p>Descuento de stock pendiente</p>
+              {c.estado === "autorizado" ? (
+                <div>
+                  <Button size="sm" onClick={() => void aplicar()} disabled={aplicando}>
+                    {aplicando ? "Aplicando…" : "Aplicar ahora"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-zinc-600 dark:text-zinc-400">Se aplica solo cuando ARCA confirme el comprobante.</p>
+              )}
+            </>
+          )}
+          {errorAplicar && (
+            <p role="alert" className="text-red-700 dark:text-red-400">
+              {errorAplicar}
+            </p>
+          )}
+          {stock.estado === "aplicado" && stock.movimientos.length > 0 && (
+            <ul className="list-disc space-y-0.5 pl-5">
+              {stock.movimientos.map((m, i) => (
+                <li key={i}>
+                  {m.marca} {m.codigo} – {m.descripcion}:{" "}
+                  <span className="tabular-nums">
+                    {m.tipo === "salida" ? "−" : "+"}
+                    {formatoCantidad.format(m.cantidad)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
