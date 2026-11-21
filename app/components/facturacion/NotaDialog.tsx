@@ -331,6 +331,7 @@ function NotaForm({
           <ItemsEditor
             items={items}
             onChange={setItems}
+            permitirStock={false}
             preciosIncluyenIva={original.preciosIncluyenIva}
             disabled={bloqueado || congelado}
           />

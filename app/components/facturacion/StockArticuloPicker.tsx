@@ -50,11 +50,17 @@ export default function StockArticuloPicker({
 
   function elegir(a: ArticuloParaVenta) {
     onElegir(a);
-    setOpen(false);
+    cambiarAbierto(false);
+  }
+
+  // Al cerrar se descartan los resultados: al reabrir no se ven cantidades viejas.
+  function cambiarAbierto(abierto: boolean) {
+    if (!abierto) setResultados(null);
+    setOpen(abierto);
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={cambiarAbierto}>
       <PopoverTrigger render={<Button type="button" variant="outline" disabled={disabled} />}>
         <WarehouseIcon />
         Agregar desde stock
