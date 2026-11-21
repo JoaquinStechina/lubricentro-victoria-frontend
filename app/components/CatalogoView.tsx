@@ -850,7 +850,11 @@ export default function CatalogoView({ searchInicial }: { searchInicial?: string
       </div>
       </DndContext>
 
-      <SeccionEquivalencias q={tabla.search} onElegir={tabla.setSearch} />
+      <SeccionEquivalencias
+        q={tabla.search}
+        tablaVacia={!loading && data?.total === 0}
+        onElegir={tabla.setSearch}
+      />
 
       <TablePaginationBar
         loading={loading}

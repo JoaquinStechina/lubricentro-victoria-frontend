@@ -7,11 +7,17 @@ import { buscarEquivalencias, esCodigoBuscable, type RespuestaBusqueda } from "@
 // Sección «EQUIVALENCIAS DE <q>» bajo la tabla del Catálogo. Hace su propio
 // pedido, con debounce, y descarta las respuestas viejas. Si q no parece un
 // código no consulta ni renderiza nada.
+//
+// «Ningún producto del catálogo tiene el código …» sale solo con la tabla
+// vacía: un texto con dígitos como «10w40» parece un código pero llena la
+// tabla de aceites, y ahí la frase la contradiría.
 export default function SeccionEquivalencias({
   q,
+  tablaVacia,
   onElegir,
 }: {
   q: string;
+  tablaVacia: boolean;
   onElegir?: (codigo: string) => void;
 }) {
   const consulta = q.trim();
@@ -36,10 +42,12 @@ export default function SeccionEquivalencias({
   }, [consulta, buscable]);
 
   if (!buscable || !respuesta || respuesta.q !== consulta) return null;
+  const sinProducto = tablaVacia && respuesta.productosBuscados.length === 0;
+  if (!sinProducto && respuesta.equivalencias.length === 0) return null;
 
   return (
     <section className="mt-4">
-      {respuesta.productosBuscados.length === 0 && (
+      {sinProducto && (
         <p className="text-sm text-muted-foreground">Ningún producto del catálogo tiene el código {consulta}</p>
       )}
       <ListaEquivalencias q={consulta} resultado={respuesta.equivalencias} onElegir={onElegir} />

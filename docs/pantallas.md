@@ -39,7 +39,7 @@ Las pantallas de facturación comparten `FacturacionNav` (Comprobantes, Ventas, 
   - «Ver cerradas/vencidas»;
   - «Marcar agotada» y «Reactivar». Cierran **todos los tramos** del SKU en esa oferta.
 
-- **Equivalencias.** Bajo la tabla, si lo buscado parece un código (3 caracteres o más y un dígito), aparece «EQUIVALENCIAS DE <código>». Cada fila muestra marca, código, producto, precio, stock y «Por qué». «vía <marca> <código>» indica un salto intermedio y «posible», una confianza media. Un clic en el código lo busca en el Catálogo.
+- **Equivalencias.** Bajo la tabla, si lo buscado parece un código (3 caracteres o más y un dígito), aparece «EQUIVALENCIAS DE <código>». Cada fila muestra marca, código, producto, precio, stock y «Por qué». «vía <marca> <código>» indica un salto intermedio y «posible», una confianza media. Un clic en el código lo busca en el Catálogo. Si la tabla queda vacía y ningún producto tiene ese código, la sección lo dice («Ningún producto del catálogo tiene el código …»); con la tabla llena (por ejemplo «10w40») no.
 
 ## Ctrl + K (en cualquier pantalla)
 
