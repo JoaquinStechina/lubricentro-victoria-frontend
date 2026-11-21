@@ -22,7 +22,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const ITEMS_ALICUOTA = Object.fromEntries(ALICUOTAS_IVA.map((a) => [String(a), etiquetaAlicuota(a)]));
 
-const GRID = "lg:grid-cols-[minmax(0,1fr)_6.5rem_9rem_7rem_8rem_2rem]";
+// La fila en una sola línea depende del ancho del editor (container query sobre
+// el `@container` de la raíz), no del viewport: el editor vive en columnas
+// angostas (al lado del resumen, en diálogos) y con `lg:` a 1024 px las columnas
+// fijas (32,5rem + huecos) dejaban la descripción en ~20 px. Con 48rem la
+// descripción conserva unos 190 px; por debajo, la fila se apila como en el celular.
+const GRID = "@3xl:grid-cols-[minmax(0,1fr)_6.5rem_9rem_7rem_8rem_2rem]";
 
 // Solo formato: el número que el usuario tipeó, tal como se leyó. Sirve para
 // que "12.500" o "1234,5" no queden librados a la interpretación del lector.
@@ -108,7 +113,7 @@ export default function ItemsEditor({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="@container flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
           Ítems <span className="font-normal text-zinc-500 dark:text-zinc-400">({items.length} de {MAX_ITEMS_VENTA})</span>
@@ -135,7 +140,7 @@ export default function ItemsEditor({
         <div className="flex flex-col gap-2">
           <div
             aria-hidden="true"
-            className={`hidden gap-2 px-1 text-xs uppercase tracking-wide text-zinc-500 lg:grid dark:text-zinc-400 ${GRID}`}
+            className={`hidden gap-2 px-1 text-xs uppercase tracking-wide text-zinc-500 @3xl:grid dark:text-zinc-400 ${GRID}`}
           >
             <span>Descripción</span>
             <span>Cantidad</span>
@@ -155,8 +160,8 @@ export default function ItemsEditor({
                 className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-2 dark:border-zinc-800 dark:bg-zinc-950/40"
               >
                 <div className={`grid grid-cols-2 items-start gap-2 ${GRID}`}>
-                  <div className="col-span-2 lg:col-span-1">
-                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 lg:hidden dark:text-zinc-400">
+                  <div className="col-span-2 @3xl:col-span-1">
+                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 @3xl:hidden dark:text-zinc-400">
                       Descripción
                     </span>
                     <Input
@@ -171,7 +176,7 @@ export default function ItemsEditor({
                     />
                   </div>
                   <div>
-                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 lg:hidden dark:text-zinc-400">
+                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 @3xl:hidden dark:text-zinc-400">
                       Cantidad
                     </span>
                     <Input
@@ -194,7 +199,7 @@ export default function ItemsEditor({
                     )}
                   </div>
                   <div>
-                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 lg:hidden dark:text-zinc-400">
+                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 @3xl:hidden dark:text-zinc-400">
                       Precio unitario
                     </span>
                     <Input
@@ -217,7 +222,7 @@ export default function ItemsEditor({
                     )}
                   </div>
                   <div>
-                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 lg:hidden dark:text-zinc-400">
+                    <span aria-hidden="true" className="mb-0.5 block text-xs text-zinc-500 @3xl:hidden dark:text-zinc-400">
                       IVA
                     </span>
                     <Select
@@ -239,7 +244,7 @@ export default function ItemsEditor({
                     </Select>
                   </div>
                   <div className="flex h-8 items-center justify-end text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
-                    <span aria-hidden="true" className="mr-2 text-xs text-zinc-500 lg:hidden dark:text-zinc-400">
+                    <span aria-hidden="true" className="mr-2 text-xs text-zinc-500 @3xl:hidden dark:text-zinc-400">
                       Total
                     </span>
                     {importe === undefined || importe === null ? (
