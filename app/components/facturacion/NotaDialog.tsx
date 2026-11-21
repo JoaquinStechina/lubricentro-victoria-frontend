@@ -272,7 +272,7 @@ function NotaForm({
     total && stock !== null && ((stock.estado === "aplicado" && stock.movimientos.length > 0) || stock.estado === "pendiente");
   const puedeEmitir =
     total
-      ? !cargandoStock && errorStock === null && (!preguntaStock || reponer !== null)
+      ? !cargandoStock && (errorStock !== null || !preguntaStock || reponer !== null)
       : itemsNota !== undefined && calculo !== null;
 
   // Tras un fallo incierto el formulario queda congelado (ver NotaDialog).
@@ -411,6 +411,9 @@ function NotaForm({
       {total && errorStock && (
         <div role="alert" className={`${CAJA} ${ROJO}`}>
           <p className="font-medium">No pudimos consultar el stock de la factura: {errorStock.error}</p>
+          <p className="mt-1">
+            Podés reintentar, o emitir la anulación igual: en ese caso <strong>no se repone stock</strong>.
+          </p>
           <Button variant="outline" size="sm" className="mt-2" onClick={() => setIntentoStock((n) => n + 1)}>
             Reintentar
           </Button>
