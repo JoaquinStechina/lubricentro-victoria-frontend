@@ -1,0 +1,35 @@
+# Despliegue
+
+> **Regla:** un push a `master` despliega a producción solo. El cliente usa el sistema durante el día, así que **no se pushea a `master` sin el OK del dueño**. Un push a cualquier otra rama solo corre la CI.
+
+## Build
+
+- **Salida `standalone`.** `next.config.ts` usa `output: "standalone"`. El `Dockerfile` (multi-stage, `node:20-slim`) copia `.next/standalone` y corre `node server.js`.
+- **`NEXT_PUBLIC_API_URL`** es la única variable. Se **hornea al compilar**, así que en el `docker-compose.yml` del VPS entra como `build-arg`, no como variable de runtime. En producción apunta al mismo origen que sirve nginx.
+
+## CI/CD (`.github/workflows/`)
+
+| Workflow | Cuándo corre | Qué hace |
+|---|---|---|
+| `ci.yml` | Push a cualquier rama que no sea `master` y PRs. | `npm ci`, `tsc --noEmit`, `eslint .` y `npm run build`. |
+| `deploy.yml` | Push a `master`. | CI y, si pasa, SSH al VPS para ejecutar `deploy-frontend.sh`. |
+
+`deploy-frontend.sh` hace esto, en orden:
+
+1. Toma el mismo lock que el deploy del backend, para que los dos no recreen contenedores a la vez.
+2. `git pull`.
+3. `docker compose build frontend`.
+4. `docker compose up -d --no-deps frontend`.
+
+**Para frenar un deploy**, cancelá el run en GitHub Actions antes de que arranque el job de deploy.
+
+## En el VPS
+
+- **Ubicación.** El clon vive en `/opt/lubricentro-victoria/lubricentro-victoria-front/`.
+- **nginx.** Sirve todo lo que no es `/api/` ni `/uploads/imagenes/` desde este contenedor (puerto 3000). El basic auth de nginx protege también al frontend.
+- **Más detalle.** El resto de la infraestructura está en `docs/despliegue.md` del backend.
+
+## Orden al desplegar cambios que tocan los dos repos
+
+1. **Primero el backend,** sobre todo si trae una migración o un endpoint nuevo.
+2. **Después el frontend.** Si el frontend sale primero, puede llamar a endpoints que todavía no existen.
