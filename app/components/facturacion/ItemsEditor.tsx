@@ -39,7 +39,7 @@ function advertenciaIva(origen: ItemFormulario["origenPrecio"], preciosIncluyenI
   if (origen === "neto" && preciosIncluyenIva) {
     return "Este precio es neto (sin IVA) pero la venta tiene tildado «Los precios incluyen IVA»: se tomaría como precio final.";
   }
-  if (origen === "conIva" && !preciosIncluyenIva) {
+  if ((origen === "conIva" || origen === "sugerido") && !preciosIncluyenIva) {
     return "Este precio ya incluye IVA pero la venta no tiene tildado «Los precios incluyen IVA»: se le sumaría IVA encima.";
   }
   return null;
@@ -271,6 +271,7 @@ export default function ItemsEditor({
                   <div className="mt-1.5 flex flex-col gap-0.5 text-xs">
                     <div className="flex flex-wrap items-center gap-2 text-zinc-600 dark:text-zinc-400">
                       {item.origenPrecio === "neto" && <Badge variant="outline">Precio neto del catálogo</Badge>}
+                      {item.origenPrecio === "sugerido" && <Badge variant="outline">Precio sugerido del catálogo</Badge>}
                       {item.origenPrecio === "conIva" && <Badge variant="outline">Precio con IVA del catálogo</Badge>}
                       {item.avisosCatalogo.map((a) => (
                         <span key={a}>{a}</span>

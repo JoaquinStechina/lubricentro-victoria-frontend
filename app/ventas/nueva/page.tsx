@@ -40,7 +40,7 @@ export default function NuevaVentaPage() {
 function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [avisoCliente, setAvisoCliente] = useState<string | null>(null);
-  const [preciosIncluyenIva, setPreciosIncluyenIva] = useState(false);
+  const [preciosIncluyenIva, setPreciosIncluyenIva] = useState(true);
   const [items, setItems] = useState<ItemFormulario[]>([]);
   const [observaciones, setObservaciones] = useState("");
 

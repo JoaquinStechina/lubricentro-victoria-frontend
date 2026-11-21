@@ -25,7 +25,7 @@ export function etiquetaAlicuota(porcentaje: number): string {
 
 // Qué precio del catálogo se usó para precargar una fila (null si la fila se
 // armó a mano o el usuario tocó el precio después).
-export type OrigenPrecio = "neto" | "conIva" | "ninguno";
+export type OrigenPrecio = "neto" | "conIva" | "sugerido" | "ninguno";
 
 export type ItemFormulario = {
   /** Identidad estable de la fila (no es el índice): ver ItemsEditor. */
