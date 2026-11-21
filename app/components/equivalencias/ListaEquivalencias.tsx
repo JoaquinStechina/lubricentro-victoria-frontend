@@ -67,6 +67,10 @@ export function FilaEquivalencia({
             variant="ghost"
             size="sm"
             className="ml-auto"
+            // Enter/Espacio activan solo el descarte: cmdk selecciona el ítem resaltado ante cualquier Enter.
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onDescartar(r);

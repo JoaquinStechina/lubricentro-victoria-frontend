@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PackageIcon, ReceiptIcon, UploadCloudIcon } from "lucide-react";
 import CatalogoView from "@/app/components/CatalogoView";
@@ -20,8 +20,18 @@ function CatalogoConBusqueda() {
   return <CatalogoView key={search ?? ""} searchInicial={search} />;
 }
 
+// Al llegar con un ?search= nuevo (p. ej. Enter en la ventana Ctrl + K) pasa a la pestaña Catálogo.
+function CambiarACatalogoConBusqueda({ onBusqueda }: { onBusqueda: () => void }) {
+  const search = useSearchParams().get("search");
+  useEffect(() => {
+    if (search) onBusqueda();
+  }, [search, onBusqueda]);
+  return null;
+}
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("catalogo");
+  const irACatalogo = useCallback(() => setTab("catalogo"), []);
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-black">
@@ -54,6 +64,10 @@ export default function Home() {
             <ThemeToggle />
           </div>
         </header>
+
+        <Suspense fallback={null}>
+          <CambiarACatalogoConBusqueda onBusqueda={irACatalogo} />
+        </Suspense>
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
           <TabsList className="mb-6">
