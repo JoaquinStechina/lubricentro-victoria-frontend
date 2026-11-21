@@ -10,6 +10,15 @@ Interfaz de la facturación electrónica de ARCA. La lógica fiscal (clase A o B
 4. **Facturar:** desde la venta recién creada o desde el listado `/ventas`, con `useEmitirFactura`.
 5. **Comprobante** (`/facturacion/[id]`): detalle, PDF, observaciones de ARCA, notas de crédito y débito, y reconciliación.
 
+## Ventas ya facturadas por fuera (`/ventas/ya-facturada`)
+
+Para una venta que **ya se facturó por otro medio** (por ejemplo en Comprobantes en línea): queda en el historial con los datos de su factura y **nunca se informa a ARCA**, porque sería facturar dos veces. Se llega con «Registrar venta ya facturada» desde Comprobantes o Ventas.
+
+- **Envío.** Manda `POST /api/ventas/externas` con tipo (A o B), punto de venta, número y fecha de la factura real, más cliente e ítems. No importa `useEmitirFactura` y no tiene «Facturar»: un solo botón, «Registrar venta».
+- **Previsualización.** Solo muestra totales. Sus `errores` son reglas para emitir por ARCA y acá no se muestran. Si la clase que saldría para el cliente no coincide con el tipo elegido, avisa sin bloquear.
+- **Doble envío.** Reintentar es seguro: la misma factura no se registra dos veces (`409` que dice en qué venta está).
+- **Listado de Ventas.** Muestra «Facturada por fuera» (`estadoFactura: "facturada_fuera"`) y la referencia `Factura B 0001-00006001`, sin «Facturar» ni «Ver comprobantes». Eliminarla no anula la factura real.
+
 ## Banner de estado (`EstadoArcaBanner`)
 
 - **Aviso de ambiente.** Muestra si ARCA no está configurada y en qué ambiente se trabaja. En homologación avisa que los comprobantes no tienen validez fiscal.

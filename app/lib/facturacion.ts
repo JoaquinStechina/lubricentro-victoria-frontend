@@ -112,7 +112,17 @@ export type VentaItem = {
   alicuotaIva: number;
 };
 
-export type EstadoFactura = "sin_facturar" | "pendiente" | "facturada" | "con_notas";
+// "facturada_fuera": venta ya facturada por otro medio (origen "externa"). No
+// tiene comprobantes en el sistema y NUNCA se factura por ARCA desde acá.
+export type EstadoFactura = "sin_facturar" | "pendiente" | "facturada" | "con_notas" | "facturada_fuera";
+
+// "sistema": se carga y se factura por ARCA desde acá. "externa": ya se
+// facturó por otro medio (p. ej. Comprobantes en línea) y solo se registra
+// para el historial; nunca se informa a ARCA.
+export type OrigenVenta = "sistema" | "externa";
+
+// La factura real de una venta externa: 1 Factura A, 6 Factura B.
+export type FacturaExterna = { tipo: number; ptoVta: number; nro: number };
 
 type VentaBase = {
   id: number;
@@ -124,6 +134,9 @@ type VentaBase = {
   condicionVenta: string;
   observaciones: string | null;
   eliminado: boolean;
+  origen: OrigenVenta;
+  /** Solo en las ventas externas; null en las del sistema. */
+  facturaExterna: FacturaExterna | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -290,6 +303,11 @@ export function etiquetaTipo(tipo: number): string {
   return TIPOS[tipo] ?? `Comprobante ${tipo}`;
 }
 
+/** "Factura B 0001-00006001": la factura real de una venta externa. */
+export function referenciaFacturaExterna(f: FacturaExterna): string {
+  return `${etiquetaTipo(f.tipo)} ${formatearNroComprobante(f.ptoVta, f.nro)}`;
+}
+
 // Los seis códigos que emite el sistema, en el orden del filtro del listado.
 export const TIPOS_COMPROBANTE: number[] = [1, 6, 2, 7, 3, 8];
 
@@ -365,6 +383,7 @@ const ESTADOS_FACTURA: Record<EstadoFactura, string> = {
   pendiente: "Pendiente de ARCA",
   facturada: "Facturada",
   con_notas: "Facturada con notas",
+  facturada_fuera: "Facturada por fuera",
 };
 
 export function etiquetaEstadoFactura(estado: EstadoFactura): string {
@@ -485,4 +504,25 @@ export function jsonInit(body: unknown, method: "POST" | "PUT" | "PATCH" = "POST
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Ventas ya facturadas por fuera
+// ---------------------------------------------------------------------------
+
+// Body de POST /api/ventas/externas. Registra una venta que YA se facturó por
+// otro medio: el backend la guarda con origen "externa" y nunca la informa a
+// ARCA. No hay forma de facturarla desde el sistema.
+export type NuevaVentaExterna = {
+  clienteId: number | null;
+  /** YYYY-MM-DD, la de la factura real. No puede ser futura. */
+  fecha: string;
+  preciosIncluyenIva: boolean;
+  items: ItemEntrada[];
+  observaciones: string | null;
+  factura: FacturaExterna;
+};
+
+export function registrarVentaExterna(body: NuevaVentaExterna): Promise<RespuestaApi<VentaDetalle>> {
+  return fetchFacturacion<VentaDetalle>("/api/ventas/externas", jsonInit(body, "POST"));
 }

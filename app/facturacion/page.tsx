@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ArrowLeftIcon, PlusIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, FileCheckIcon, PlusIcon, XIcon } from "lucide-react";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
@@ -143,7 +143,12 @@ function ComprobantesView() {
             </Link>
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">Comprobantes</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Para ventas que ya se facturaron por otro medio: se registran sin pasar por ARCA. */}
+            <Button variant="outline" nativeButton={false} render={<Link href="/ventas/ya-facturada" />}>
+              <FileCheckIcon />
+              Registrar venta ya facturada
+            </Button>
             <Button nativeButton={false} render={<Link href="/ventas/nueva" />}>
               <PlusIcon />
               Nueva venta
