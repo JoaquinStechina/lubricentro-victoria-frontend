@@ -16,7 +16,8 @@ type Tab = "catalogo" | "ofertas";
 // Suspense que pide useSearchParams no cubra toda la página.
 function CatalogoConBusqueda() {
   const search = useSearchParams().get("search") ?? undefined;
-  return <CatalogoView searchInicial={search} />;
+  // La key remonta la vista cuando cambia ?search= (p. ej. Enter en la ventana Ctrl + K estando en el Catálogo).
+  return <CatalogoView key={search ?? ""} searchInicial={search} />;
 }
 
 export default function Home() {
