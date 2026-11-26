@@ -37,6 +37,13 @@ El sistema pide **una sola clave**, sin usuario. Quien la controla es la API (ba
   Sin sesión, cierra la pestaña y va a `/entrar`.
 - **Con Ctrl, rueda del mouse o «Abrir en otra pestaña»** se usa el `href` tal cual. El navegador manda la cookie igual; si la sesión venció, esa pestaña muestra el mensaje de error de la API.
 
+## Pedidos desde otro origen
+
+La API acepta los pedidos que cambian datos (`POST`, `PUT`, `PATCH`, `DELETE`) solo si el navegador dice que vienen de la página del sistema: el `Origin` (o el `Referer`) tiene que ser `FRONTEND_URL` o `URL_PUBLICA` del backend. Si no, responde `403` con un mensaje y no hace nada. Es por la cookie `SameSite=Lax`, que viaja también desde otra página del mismo servidor en otro puerto (ver «Origen de los pedidos que cambian datos» en `docs/acceso.md` del backend).
+
+- **En el VPS** el frontend y la API están en el mismo origen, que es `URL_PUBLICA`: no hay nada que hacer.
+- **Si el sistema pasa a otra dirección** (un dominio con HTTPS), hay que cambiar `URL_PUBLICA` y `FRONTEND_URL` en el backend y recompilar este frontend con la `NEXT_PUBLIC_API_URL` nueva. Si no, guardar y facturar dan `403`.
+
 ## «Salir»
 
 - Está en la cabecera de todas las pantallas, al lado del selector de tema.
@@ -47,6 +54,7 @@ El sistema pide **una sola clave**, sin usuario. Quien la controla es la API (ba
 
 - El backend necesita `CLAVE_ACCESO_HASH` en su `.env` (`npm run clave:hash`), o `ACCESO_DESACTIVADO=1` para trabajar sin clave.
 - La API responde CORS con credenciales para `FRONTEND_URL` (`http://localhost:3000`).
+- **Abrí el frontend como `http://localhost:3000`**, no como `127.0.0.1:3000`: la API rechaza (`403`) los `POST`, `PUT`, `PATCH` y `DELETE` cuyo `Origin` no sea `FRONTEND_URL` o `URL_PUBLICA` (ver «Pedidos desde otro origen»).
 - Las fotos (`<img>` hacia `:4000`) llevan la cookie solas: `localhost:3000` y `localhost:4000` son el mismo *site*.
 
 ## Al desplegar
