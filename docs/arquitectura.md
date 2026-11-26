@@ -3,9 +3,10 @@
 ## Cómo se habla con la API
 
 - **Sin proxy.** Todas las páginas son client components y hacen `fetch` directo al backend desde el navegador. No hay proxy por Route Handlers.
-- **`app/lib/api.ts`** es el cliente fino:
-  - `API_URL`: `NEXT_PUBLIC_API_URL`, o `http://localhost:4000` por defecto;
-  - `apiFetch<T>(path, init)`: `fetch` + `res.json()` que lanza si la respuesta no es ok;
+- **`app/lib/sesion.ts`:** `fetchApi(path, init)` es el **único** `fetch` hacia la API. Manda la cookie (`credentials: "include"`) y ante un `401` lleva a `/entrar?volver=<página>`. Ver [acceso.md](acceso.md).
+- **`app/lib/api.ts`** es el cliente fino, sobre `fetchApi`:
+  - `API_URL`: `NEXT_PUBLIC_API_URL`, o `http://localhost:4000` por defecto (vive en `apiUrl.ts`);
+  - `apiFetch<T>(path, init)`: `fetchApi` + `res.json()` que lanza si la respuesta no es ok;
   - `apiJsonInit(body, method)`: arma un `RequestInit` con JSON;
   - `apiDownload(path, filename)`: descarga los exports CSV o XLSX;
   - `imagenSrc(path)`: arma la URL completa de una imagen a partir de la ruta relativa que devuelve el backend.

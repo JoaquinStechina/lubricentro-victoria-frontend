@@ -7,6 +7,7 @@ import { ArrowLeftRightIcon, PackageIcon, ReceiptIcon, UploadCloudIcon } from "l
 import CatalogoView from "@/app/components/CatalogoView";
 import OfertasView from "@/app/components/OfertasView";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -78,6 +79,7 @@ export default function Home() {
               </Button>
             </Link>
             <ThemeToggle />
+            <BotonSalir />
           </div>
         </header>
 

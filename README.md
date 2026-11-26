@@ -19,6 +19,8 @@ npm install
 npm run dev          # http://localhost:3000; necesita el backend en http://localhost:4000
 ```
 
+El sistema pide una clave: la del `CLAVE_ACCESO_HASH` del backend. Para desarrollar sin clave, poné `ACCESO_DESACTIVADO=1` en el `.env` del backend.
+
 Para usar otra URL de la API, definí `NEXT_PUBLIC_API_URL` en `.env.local`. Se hornea al compilar.
 
 ## Comandos
@@ -50,7 +52,7 @@ data/                 JSON del prototipo original: ya no los usa nada
 ## Reglas para agentes
 
 1. **Esta versión de Next tiene cambios incompatibles con lo que conocés.** Antes de usar una API de Next, leé la guía en `node_modules/next/dist/docs/` (ver `AGENTS.md`).
-2. **Todo se pide desde el navegador.** Todas las páginas son client components (`"use client"`) y llaman a la API desde el navegador con `apiFetch` (`app/lib/api.ts`). No hay Route Handlers, server actions ni fetch del lado del servidor. Mantenelo así: el basic auth de nginx depende de que los pedidos los haga el navegador.
+2. **Todo se pide desde el navegador, con la sesión.** Todas las páginas son client components (`"use client"`) y llaman a la API desde el navegador. **Todo pedido pasa por `fetchApi` (`app/lib/sesion.ts`)**, directamente o a través de `apiFetch`, `apiDownload` o `fetchFacturacion`: manda la cookie de sesión y, ante un `401`, lleva a `/entrar`. No uses `fetch` suelto contra la API. No hay Route Handlers, server actions ni fetch del lado del servidor: la cookie la tiene el navegador. nginx no tiene basic auth activo; ver [docs/acceso.md](docs/acceso.md).
 3. **`NEXT_PUBLIC_API_URL` se hornea en el build.** Cambiarla exige recompilar.
 4. **Los tipos de la API son copias a mano** de lo que devuelve el backend (`app/lib/*.ts`), porque no hay un paquete compartido. Si cambia una respuesta del backend, actualizá el tipo acá.
 5. **Facturación:**
@@ -65,6 +67,7 @@ data/                 JSON del prototipo original: ya no los usa nada
 | Doc | Contenido |
 |---|---|
 | [docs/arquitectura.md](docs/arquitectura.md) | Cómo se habla con la API, hooks compartidos, componentes y estilos. |
+| [docs/acceso.md](docs/acceso.md) | Pantalla «Entrar», sesión, botón «Salir» y qué pasa ante un 401. |
 | [docs/pantallas.md](docs/pantallas.md) | Qué hace cada ruta y qué endpoints usa. |
 | [docs/facturacion.md](docs/facturacion.md) | Flujo de ventas, emisión, notas y reconciliación en la UI. |
 | [docs/despliegue.md](docs/despliegue.md) | Build, CI/CD y variables. |

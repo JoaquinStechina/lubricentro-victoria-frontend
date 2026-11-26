@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeftIcon, PackageIcon } from "lucide-react";
 import { apiFetch, apiJsonInit } from "@/app/lib/api";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,6 +66,7 @@ export default function GestionPage() {
               </Button>
             </Link>
             <ThemeToggle />
+            <BotonSalir />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             Catálogo y ofertas

@@ -9,7 +9,9 @@ import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import { AMBAR, CAJA, CELESTE, ROJO, TARJETA } from "@/app/components/facturacion/estilos";
 import NotaDialog from "@/app/components/facturacion/NotaDialog";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import { API_URL } from "@/app/lib/api";
+import { abrirPdf } from "@/app/lib/sesion";
 import {
   ErrorApi,
   admiteNotas,
@@ -145,6 +147,7 @@ export default function ComprobanteDetallePage() {
             </h1>
           </div>
           <ThemeToggle />
+          <BotonSalir />
         </header>
 
         <FacturacionNav />
@@ -211,7 +214,8 @@ function Detalle({
   const condicion = condicionIvaPorId(c.receptorCondicionIvaId);
   // Facturas (1, 6) y notas de crédito (3, 8) mueven stock; las de débito no.
   const ajustaStock = [1, 6, 3, 8].includes(c.tipo);
-  const urlPdf = `${API_URL}/api/facturacion/comprobantes/${c.id}/pdf`;
+  const rutaPdf = `/api/facturacion/comprobantes/${c.id}/pdf`;
+  const urlPdf = `${API_URL}${rutaPdf}`;
 
   async function reconciliar() {
     if (enVuelo.current) return;
@@ -340,7 +344,24 @@ function Detalle({
       {(c.estado === "autorizado" || admiteNotas(c.tipo, c.estado)) && (
         <div className="flex flex-wrap gap-2">
           {c.estado === "autorizado" && (
-            <Button variant="outline" nativeButton={false} render={<a href={urlPdf} target="_blank" rel="noopener" />}>
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={
+                <a
+                  href={urlPdf}
+                  target="_blank"
+                  rel="noopener"
+                  // Clic común: confirma la sesión antes de abrir (abrirPdf). El
+                  // href queda para "abrir en otra pestaña" y para copiar el link.
+                  onClick={(e) => {
+                    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                    e.preventDefault();
+                    void abrirPdf(rutaPdf);
+                  }}
+                />
+              }
+            >
               <DownloadIcon />
               Descargar PDF
             </Button>

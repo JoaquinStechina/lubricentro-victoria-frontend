@@ -26,10 +26,12 @@
 ## En el VPS
 
 - **Ubicación.** El clon vive en `/opt/lubricentro-victoria/lubricentro-victoria-front/`.
-- **nginx.** Sirve todo lo que no es `/api/` ni `/uploads/imagenes/` desde este contenedor (puerto 3000). El basic auth de nginx protege también al frontend.
+- **nginx.** Sirve todo lo que no es `/api/` ni `/uploads/imagenes/` desde este contenedor (puerto 3000), en el mismo origen que la API. nginx **no** pide contraseña: la pide la API (ver [acceso.md](acceso.md)). Las páginas son públicas pero vacías; los datos llegan de la API solo con sesión.
 - **Más detalle.** El resto de la infraestructura está en `docs/despliegue.md` del backend.
 
 ## Orden al desplegar cambios que tocan los dos repos
 
 1. **Primero el backend,** sobre todo si trae una migración o un endpoint nuevo.
 2. **Después el frontend.** Si el frontend sale primero, puede llamar a endpoints que todavía no existen.
+
+**Excepción: el acceso con clave** (rama `feat/acceso-con-clave`) va al revés, **primero el frontend**. El frontend nuevo funciona igual con el backend viejo, y cuando sale el backend que pide la clave la pantalla «Entrar» ya está. Los pasos completos, incluida la clave en el `.env`, están en `docs/acceso.md` del backend.

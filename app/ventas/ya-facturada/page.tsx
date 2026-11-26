@@ -14,6 +14,7 @@ import ClientePicker from "@/app/components/facturacion/ClientePicker";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ItemsEditor from "@/app/components/facturacion/ItemsEditor";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import {
   ErrorApi,
   formatearMoneda,
@@ -191,6 +192,7 @@ function RegistrarVentaYaFacturada({ onOtra }: { onOtra: () => void }) {
             </h1>
           </div>
           <ThemeToggle />
+          <BotonSalir />
         </header>
 
         <FacturacionNav />

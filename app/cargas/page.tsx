@@ -7,6 +7,7 @@ import { apiFetch } from "@/app/lib/api";
 import { ESTADO_LABELS, TIPO_DATOS_LABELS, type Carga, type CargaEstado } from "@/app/lib/cargas";
 import UploadForm from "@/app/components/cargas/UploadForm";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ export default function CargasPage() {
                 </Button>
               </Link>
               <ThemeToggle />
+              <BotonSalir />
             </div>
           </div>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">

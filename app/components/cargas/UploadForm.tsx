@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { UploadCloudIcon } from "lucide-react";
-import { API_URL } from "@/app/lib/api";
+import { fetchApi } from "@/app/lib/sesion";
 import { ACCEPTED_EXTENSIONS, TIPO_DATOS_LABELS, type Carga, type TipoDatos } from "@/app/lib/cargas";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -51,7 +51,7 @@ export default function UploadForm({ onUploaded }: UploadFormProps) {
       if (tipoDatos === "oferta") formData.append("sinFechaLimite", String(sinFechaLimite));
       if (proveedorNombre.trim()) formData.append("proveedor", proveedorNombre.trim());
 
-      const res = await fetch(`${API_URL}/api/uploads`, {
+      const res = await fetchApi("/api/uploads", {
         method: "POST",
         body: formData,
       });

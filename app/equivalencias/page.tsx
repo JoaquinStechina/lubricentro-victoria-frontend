@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import ListaEquivalencias from "@/app/components/equivalencias/ListaEquivalencias";
 import {
   agregarEquivalencia,
@@ -342,6 +343,7 @@ export default function EquivalenciasPage() {
             </h1>
           </div>
           <ThemeToggle />
+          <BotonSalir />
         </header>
 
         <Estado version={version} onCambio={cambio} />

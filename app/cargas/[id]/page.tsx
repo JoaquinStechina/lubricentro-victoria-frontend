@@ -9,6 +9,7 @@ import type { Carga } from "@/app/lib/cargas";
 import ReviewTable from "@/app/components/cargas/ReviewTable";
 import ReviewTableOfertas from "@/app/components/cargas/ReviewTableOfertas";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import { Button } from "@/components/ui/button";
 
 const LOADER_STAGES = [
@@ -162,6 +163,7 @@ function Wrapper({ carga, children }: { carga?: Carga; children: React.ReactNode
               ← Cargas
             </Link>
             <ThemeToggle />
+            <BotonSalir />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             {carga?.nombreArchivo ?? "Cargando…"}
