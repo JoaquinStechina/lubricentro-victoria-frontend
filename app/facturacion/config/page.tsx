@@ -6,6 +6,7 @@ import { ArrowLeftIcon, CheckCircle2Icon } from "lucide-react";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import { ErrorApi, fetchFacturacion, jsonInit, type ConfigFiscal } from "@/app/lib/facturacion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ export default function DatosFiscalesPage() {
             </h1>
           </div>
           <ThemeToggle />
+          <BotonSalir />
         </header>
 
         <FacturacionNav />

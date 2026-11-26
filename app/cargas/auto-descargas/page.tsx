@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeftIcon, PackageIcon } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import AutoDescargasView from "@/app/components/autoDescargas/AutoDescargasView";
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +27,7 @@ export default function AutoDescargasPage() {
               </Button>
             </Link>
             <ThemeToggle />
+            <BotonSalir />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
             Auto-descargas por marca

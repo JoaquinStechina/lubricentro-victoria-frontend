@@ -2,6 +2,7 @@
 
 | Ruta | Qué es | Endpoints principales |
 |---|---|---|
+| `/entrar` | Pantalla para entrar con la clave. Al entrar vuelve a `?volver=`. | `/api/acceso/entrar`, `/api/acceso/estado` |
 | `/` | Catálogo y Ofertas, en pestañas. | `/api/productos*`, `/api/ofertas*` |
 | `/cargas` | Subir un archivo de proveedor y ver el estado de las cargas. | `/api/uploads` |
 | `/cargas/[id]` | Revisión de una carga antes de publicarla. | `/api/uploads/:id`, `/advertencias`, `/confirmar` |
@@ -15,6 +16,8 @@
 | `/facturacion` | Comprobantes emitidos, con filtros. Admite `?ventaId=`. | `/api/facturacion/comprobantes` |
 | `/facturacion/[id]` | Detalle, PDF, notas, reconciliación y estado del stock. | `/api/facturacion/comprobantes/:id*` (incl. `/stock`) |
 | `/facturacion/config` | Datos fiscales del emisor y punto de venta. | `/api/facturacion/config` |
+
+Todas las pantallas, salvo `/entrar`, tienen el botón **Salir** al lado del selector de tema.
 
 Las pantallas de facturación comparten `FacturacionNav` (Comprobantes, Ventas, Clientes y Datos fiscales) y el banner de estado de ARCA. Ver [facturacion.md](facturacion.md).
 

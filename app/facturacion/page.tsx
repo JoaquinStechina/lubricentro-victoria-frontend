@@ -8,6 +8,7 @@ import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import {
   esAmbienteDePrueba,
   etiquetaAmbiente,
@@ -154,6 +155,7 @@ function ComprobantesView() {
               Nueva venta
             </Button>
             <ThemeToggle />
+            <BotonSalir />
           </div>
         </header>
 

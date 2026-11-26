@@ -9,6 +9,7 @@ import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ResultadoEmisionPanel from "@/app/components/facturacion/ResultadoEmisionPanel";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import {
   ErrorApi,
   etiquetaEstadoFactura,
@@ -185,6 +186,7 @@ export default function VentasPage() {
               </Button>
             )}
             <ThemeToggle />
+            <BotonSalir />
           </div>
         </header>
 

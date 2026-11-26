@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeftIcon } from "lucide-react";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import StockView from "@/app/components/stock/StockView";
 import MovimientosView from "@/app/components/stock/MovimientosView";
 import ReposicionView from "@/app/components/stock/ReposicionView";
@@ -31,6 +32,7 @@ export default function StockPage() {
             </h1>
           </div>
           <ThemeToggle />
+          <BotonSalir />
         </header>
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>

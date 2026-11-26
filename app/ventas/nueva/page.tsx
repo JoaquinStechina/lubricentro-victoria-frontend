@@ -11,6 +11,7 @@ import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import ItemsEditor from "@/app/components/facturacion/ItemsEditor";
 import ResultadoEmisionPanel from "@/app/components/facturacion/ResultadoEmisionPanel";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import {
   ErrorApi,
   etiquetaTipo,
@@ -188,6 +189,7 @@ function NuevaVenta({ onOtraVenta }: { onOtraVenta: () => void }) {
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">Nueva venta</h1>
           </div>
           <ThemeToggle />
+          <BotonSalir />
         </header>
 
         <FacturacionNav />

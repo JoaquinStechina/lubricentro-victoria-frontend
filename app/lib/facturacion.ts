@@ -9,7 +9,7 @@
 // capa nunca calcula totales ni IVA: la única fuente de cálculo es
 // POST /api/ventas/previsualizar.
 
-import { API_URL } from "@/app/lib/api";
+import { fetchApi } from "@/app/lib/sesion";
 
 // ---------------------------------------------------------------------------
 // Catálogo fiscal
@@ -464,8 +464,10 @@ export type RespuestaApi<T> = { status: number; data: T };
 export async function fetchFacturacion<T>(path: string, init?: RequestInit): Promise<RespuestaApi<T>> {
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, init);
-  } catch {
+    res = await fetchApi(path, init);
+  } catch (e) {
+    // Sesión vencida: fetchApi ya está llevando a /entrar; el mensaje lo dice.
+    if (e instanceof Error && e.name === "SesionVencida") throw new ErrorApi(401, e.message);
     throw new ErrorApi(0, "No se pudo conectar con el servidor. Revisá tu conexión e intentá de nuevo.");
   }
   // 204 no tiene cuerpo: es un éxito con `data: null`, no un JSON inválido.

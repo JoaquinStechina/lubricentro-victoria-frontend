@@ -1,6 +1,7 @@
 // Cliente de la tabla de equivalencias (backend: src/routes/equivalencias.ts).
 // Los tipos son copias a mano de src/equivalencias/buscar.ts.
-import { API_URL, apiFetch, apiJsonInit } from "@/app/lib/api";
+import { apiFetch, apiJsonInit } from "@/app/lib/api";
+import { fetchApi } from "@/app/lib/sesion";
 
 export type ProductoEquivalente = {
   id: number;
@@ -88,7 +89,7 @@ export function esCodigoBuscable(q: string): boolean {
 
 // Los DELETE contestan 204 sin cuerpo: apiFetch haría res.json() y fallaría.
 async function apiDelete(path: string): Promise<void> {
-  const res = await fetch(`${API_URL}${path}`, { method: "DELETE" });
+  const res = await fetchApi(path, { method: "DELETE" });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Error ${res.status} en ${path}`);

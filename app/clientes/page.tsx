@@ -8,6 +8,7 @@ import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import BotonSalir from "@/app/components/BotonSalir";
 import {
   ErrorApi,
   condicionIvaPorId,
@@ -131,6 +132,7 @@ export default function ClientesPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">Clientes</h1>
           </div>
           <ThemeToggle />
+          <BotonSalir />
         </header>
 
         <FacturacionNav />
