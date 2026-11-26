@@ -13,8 +13,8 @@
 | `/ventas`, `/ventas/nueva` | Ventas y alta de venta. Desde acá se factura. | `/api/ventas*`, `/api/facturacion/comprobantes` |
 | `/ventas/ya-facturada` | Registrar una venta que ya se facturó por otro medio. **Nunca va a ARCA.** | `/api/ventas/externas`, `/api/ventas/previsualizar` |
 | `/clientes` | Receptores de facturas. | `/api/clientes*` |
-| `/facturacion` | Comprobantes emitidos, con filtros. Admite `?ventaId=`. | `/api/facturacion/comprobantes` |
-| `/facturacion/[id]` | Detalle, PDF, notas, reconciliación y estado del stock. | `/api/facturacion/comprobantes/:id*` (incl. `/stock`) |
+| `/facturacion` | Comprobantes emitidos, con filtros. Admite `?ventaId=`. Botón «QR» en los autorizados. | `/api/facturacion/comprobantes`, `.../:id/enlace-publico` |
+| `/facturacion/[id]` | Detalle, QR para el cliente, PDF, notas, reconciliación y estado del stock. | `/api/facturacion/comprobantes/:id*` (incl. `/stock` y `/enlace-publico`) |
 | `/facturacion/config` | Datos fiscales del emisor y punto de venta. | `/api/facturacion/config` |
 
 Todas las pantallas, salvo `/entrar`, tienen el botón **Salir** al lado del selector de tema.

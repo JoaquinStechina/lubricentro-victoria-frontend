@@ -8,7 +8,7 @@ Interfaz de la facturación electrónica de ARCA. La lógica fiscal (clase A o B
 2. **Clientes** (`/clientes`): documento, nombre y condición de IVA. La condición decide si la factura sale A o B. Sin cliente, la venta es a Consumidor Final.
 3. **Nueva venta** (`/ventas/nueva`): cliente, ítems (a mano o desde el catálogo con `ProductoCatalogoPicker`) y si los precios incluyen IVA. Los totales los calcula `POST /api/ventas/previsualizar` (`usePrevisualizacion`). El formulario no hace cuentas.
 4. **Facturar:** desde la venta recién creada o desde el listado `/ventas`, con `useEmitirFactura`.
-5. **Comprobante** (`/facturacion/[id]`): detalle, PDF, observaciones de ARCA, notas de crédito y débito, y reconciliación.
+5. **Comprobante** (`/facturacion/[id]`): detalle, QR para el cliente, PDF, observaciones de ARCA, notas de crédito y débito, y reconciliación. Después de facturar se llega acá.
 
 ## Ventas ya facturadas por fuera (`/ventas/ya-facturada`)
 
@@ -45,6 +45,21 @@ Para una venta que **ya se facturó por otro medio** (por ejemplo en Comprobante
 - **Clave de idempotencia.** Se guarda junto con una huella del pedido (naturaleza, ítems y `reponerStock`) y sobrevive al cierre del diálogo.
 - **Fallo incierto.** Tras un fallo incierto (sin respuesta o 5xx), el formulario **se congela**: solo se puede reintentar con la misma clave o cerrar. Editarlo crearía una clave nueva y podría duplicar la nota.
 - **Error `503`.** Significa que ARCA no está configurada. Es un fracaso definitivo, no una duda: el backend responde antes de crear nada.
+
+## QR para el cliente (`QrClienteDialog`)
+
+El cliente escanea un QR en la pantalla del mostrador y ve su comprobante (el PDF) en el celular, sin entrar al sistema.
+
+- **Dónde está.** «Mostrar QR para el cliente» es el primer botón del detalle de un comprobante `autorizado`: después de facturar (o de emitir una nota) se llega ahí. En el listado de Comprobantes, cada fila autorizada tiene un botón «QR».
+- **Qué pide.** Al abrir, `GET /api/facturacion/comprobantes/:id/enlace-publico` → `{ url, qrSvg }` (`obtenerEnlacePublico`). El backend crea el enlace la primera vez y después devuelve siempre el mismo. Un `503` (falta `URL_PUBLICA` en el servidor) o un `409` se muestran con «Reintentar».
+- **Qué muestra:**
+  - el QR grande, **negro sobre blanco también en modo oscuro**, con «Escaneá para ver tu factura» y el tipo y número del comprobante;
+  - el SVG va como `data:` URI en un `<img>`, no inyectado en la página: no puede ejecutar nada;
+  - «Pantalla completa»: el diálogo pasa a cubrir toda la ventana, blanco y solo con el QR, y además pide la pantalla completa del navegador (Fullscreen API). Si el navegador no la da, el QR igual ocupa toda la ventana. Esc o «Salir de pantalla completa» vuelven al diálogo normal (Esc no lo cierra);
+  - el diálogo normal tiene alto acotado y scroll: en una pantalla de 768 px entra entero;
+  - el enlace en un campo de solo lectura y «Copiar enlace».
+- **Copiar sin HTTPS.** `navigator.clipboard` solo existe con HTTPS o en `localhost`. Mientras el sistema se use por `http://IP`, «Copiar enlace» selecciona el campo y usa `document.execCommand("copy")`; si eso también falla, deja el enlace seleccionado y pide Ctrl + C.
+- **Cuidado.** Quien tiene el enlace ve esa factura: el campo lo avisa.
 
 ## Reconciliar
 

@@ -8,6 +8,7 @@ import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
 import { AMBAR, CAJA, CELESTE, ROJO, TARJETA } from "@/app/components/facturacion/estilos";
 import NotaDialog from "@/app/components/facturacion/NotaDialog";
+import QrClienteDialog from "@/app/components/facturacion/QrClienteDialog";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import BotonSalir from "@/app/components/BotonSalir";
 import { API_URL } from "@/app/lib/api";
@@ -343,6 +344,9 @@ function Detalle({
 
       {(c.estado === "autorizado" || admiteNotas(c.tipo, c.estado)) && (
         <div className="flex flex-wrap gap-2">
+          {/* Primero: después de facturar se llega a esta pantalla, y lo
+              siguiente suele ser mostrarle el QR al cliente. */}
+          {c.estado === "autorizado" && <QrClienteDialog comprobante={c} />}
           {c.estado === "autorizado" && (
             <Button
               variant="outline"

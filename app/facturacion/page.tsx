@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { ArrowLeftIcon, FileCheckIcon, PlusIcon, XIcon } from "lucide-react";
 import EstadoArcaBanner from "@/app/components/facturacion/EstadoArcaBanner";
 import FacturacionNav from "@/app/components/facturacion/FacturacionNav";
+import QrClienteDialog from "@/app/components/facturacion/QrClienteDialog";
 import TablePaginationBar from "@/app/components/TablePaginationBar";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import BotonSalir from "@/app/components/BotonSalir";
@@ -271,7 +272,7 @@ function ComprobantesView() {
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>CAE</TableHead>
-                <TableHead aria-label="Acciones" className="w-20" />
+                <TableHead aria-label="Acciones" className="w-32" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -358,7 +359,8 @@ function ComprobantesView() {
                         {c.cae ?? <span className="text-zinc-400 dark:text-zinc-600">—</span>}
                       </TableCell>
                       <TableCell>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
+                          {c.estado === "autorizado" && <QrClienteDialog comprobante={c} compacto />}
                           <Button
                             variant="outline"
                             size="sm"
