@@ -55,7 +55,8 @@ El cliente escanea un QR en la pantalla del mostrador y ve su comprobante (el PD
 - **Qué muestra:**
   - el QR grande, **negro sobre blanco también en modo oscuro**, con «Escaneá para ver tu factura» y el tipo y número del comprobante;
   - el SVG va como `data:` URI en un `<img>`, no inyectado en la página: no puede ejecutar nada;
-  - «Pantalla completa» (Fullscreen API) agranda el panel del QR a toda la pantalla, para girarla hacia el cliente. Se sale con Esc o con «Salir de pantalla completa»;
+  - «Pantalla completa»: el diálogo pasa a cubrir toda la ventana, blanco y solo con el QR, y además pide la pantalla completa del navegador (Fullscreen API). Si el navegador no la da, el QR igual ocupa toda la ventana. Esc o «Salir de pantalla completa» vuelven al diálogo normal (Esc no lo cierra);
+  - el diálogo normal tiene alto acotado y scroll: en una pantalla de 768 px entra entero;
   - el enlace en un campo de solo lectura y «Copiar enlace».
 - **Copiar sin HTTPS.** `navigator.clipboard` solo existe con HTTPS o en `localhost`. Mientras el sistema se use por `http://IP`, «Copiar enlace» selecciona el campo y usa `document.execCommand("copy")`; si eso también falla, deja el enlace seleccionado y pide Ctrl + C.
 - **Cuidado.** Quien tiene el enlace ve esa factura: el campo lo avisa.
