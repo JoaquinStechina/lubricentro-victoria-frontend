@@ -46,7 +46,6 @@ app/
   lib/                Cliente HTTP, tipos de la API y hooks compartidos
 components/ui/        Componentes shadcn/Base UI
 docs/                 Documentación por tema
-data/                 JSON del prototipo original: ya no los usa nada
 ```
 
 ## Reglas para agentes
@@ -61,6 +60,7 @@ data/                 JSON del prototipo original: ya no los usa nada
 6. **Un push a `master` despliega a producción.** Trabajá en una rama y no pushees a `master` sin el OK del dueño, nunca mientras el cliente está usando el sistema.
 7. **UI en español rioplatense (voseo), con tema claro y oscuro.**
 8. **Lint con reglas de `react-hooks`:** nada de `setState` sincrónico dentro de `useEffect`.
+9. **Este repo es público.** Ni secretos, ni datos del cliente (CUIT, nombres, domicilios, la IP del servidor), ni listas de precios de proveedores. En código, tests y docs, datos sintéticos. La configuración propia del cliente (por ejemplo, sus puntos de venta manuales) vive en el `.env` del backend.
 
 ## Documentación
 

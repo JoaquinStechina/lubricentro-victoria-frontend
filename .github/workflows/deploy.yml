@@ -18,9 +18,30 @@ jobs:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          # Llave publica del servidor, cargada a mano como secreto: la linea de
+          # known_hosts que da `ssh-keyscan -t ed25519 <host>`, verificada
+          # contra la huella del servidor. Antes se aceptaba la llave que
+          # respondiera (ssh-keyscan en cada deploy), y alguien en el medio
+          # podia hacerse pasar por el servidor. Ver docs/despliegue.md (aca y en el
+          # backend).
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
+          if [ -z "$VPS_KNOWN_HOSTS" ]; then
+            echo "Falta el secreto VPS_KNOWN_HOSTS (llave publica del servidor): no se despliega." >&2
+            exit 1
+          fi
           mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
           echo "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
-          ssh -i ~/.ssh/id_ed25519 "$VPS_USER@$VPS_HOST" 'bash /opt/lubricentro-victoria/infra/deploy-frontend.sh'
+          # Se toman el tipo y la llave de cada linea y se asocian a VPS_HOST:
+          # lo que se verifica es la llave, no como se escribio el host.
+          printf '%s\n' "$VPS_KNOWN_HOSTS" | awk -v h="$VPS_HOST" 'NF >= 3 && $1 !~ /^#/ { print h, $2, $3 }' > ~/.ssh/known_hosts
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "VPS_KNOWN_HOSTS no tiene ninguna linea con el formato <host> <tipo> <llave>: no se despliega." >&2
+            exit 1
+          fi
+          ssh -i ~/.ssh/id_ed25519 \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$VPS_USER@$VPS_HOST" 'bash /opt/lubricentro-victoria/infra/deploy-frontend.sh'

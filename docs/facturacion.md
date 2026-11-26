@@ -5,6 +5,8 @@ Interfaz de la facturación electrónica de ARCA. La lógica fiscal (clase A o B
 ## Flujo
 
 1. **Datos fiscales** (`/facturacion/config`): razón social, nombre de fantasía (opcional), domicilio, punto de venta, IIBB e inicio de actividades. El CUIT y el certificado se configuran en el servidor, no acá.
+   - **Cada comprobante guarda una copia** de estos datos al emitirse, y su PDF usa esa copia: cambiarlos después no altera los ya emitidos.
+   - **Con ARCA en producción, el backend no deja emitir** si parecen los de la demo (dicen «DEMO» o «PRUEBA», o IIBB en ceros) o si el punto de venta es uno de facturación manual. Responde `400` con el motivo, que la pantalla muestra; no se gasta ningún número. Qué PV son manuales lo configura el `.env` del backend, no este repo.
 2. **Clientes** (`/clientes`): documento, nombre y condición de IVA. La condición decide si la factura sale A o B. Sin cliente, la venta es a Consumidor Final.
 3. **Nueva venta** (`/ventas/nueva`): cliente, ítems (a mano o desde el catálogo con `ProductoCatalogoPicker`) y si los precios incluyen IVA. Los totales los calcula `POST /api/ventas/previsualizar` (`usePrevisualizacion`). El formulario no hace cuentas.
 4. **Facturar:** desde la venta recién creada o desde el listado `/ventas`, con `useEmitirFactura`.
@@ -44,6 +46,7 @@ Para una venta que **ya se facturó por otro medio** (por ejemplo en Comprobante
 - **«¿Reponer al stock?».** Solo en la anulación total: pide `GET .../stock` del original. Con descuento aplicado muestra los artículos que vuelven; con descuento pendiente avisa que todavía no se aplicó: si se repone, el stock queda como estaba; si no, el descuento pendiente se aplica igual más adelante y la mercadería cuenta como vendida. En ambos casos hay que elegir «Reponer al stock» o «No reponer» (sin opción por defecto) para habilitar «Emitir». Con stock `no` o `cancelado` no pregunta y manda `reponerStock: false`. Si la consulta falla, avisa y permite reintentar o emitir sin reponer (`reponerStock: false`): el stock nunca bloquea una anulación.
 - **Clave de idempotencia.** Se guarda junto con una huella del pedido (naturaleza, ítems y `reponerStock`) y sobrevive al cierre del diálogo.
 - **Fallo incierto.** Tras un fallo incierto (sin respuesta o 5xx), el formulario **se congela**: solo se puede reintentar con la misma clave o cerrar. Editarlo crearía una clave nueva y podría duplicar la nota.
+- **Una nota por vez.** Con otra nota del mismo comprobante `pendiente`, el diálogo no deja emitir. El backend también lo controla: una nota con otra clave responde `409` (por ejemplo, desde otra pestaña).
 - **Error `503`.** Significa que ARCA no está configurada. Es un fracaso definitivo, no una duda: el backend responde antes de crear nada.
 
 ## QR para el cliente (`QrClienteDialog`)

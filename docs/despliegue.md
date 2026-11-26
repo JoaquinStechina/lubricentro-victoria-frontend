@@ -12,7 +12,7 @@
 | Workflow | Cuándo corre | Qué hace |
 |---|---|---|
 | `ci.yml` | Push a cualquier rama que no sea `master` y PRs. | `npm ci`, `tsc --noEmit`, `eslint .` y `npm run build`. |
-| `deploy.yml` | Push a `master`. | CI y, si pasa, SSH al VPS para ejecutar `deploy-frontend.sh`. |
+| `deploy.yml` | Push a `master`. | CI y, si pasa, SSH al VPS para ejecutar `deploy-frontend.sh`. Usa los secretos `VPS_SSH_KEY`, `VPS_HOST`, `VPS_USER` y `VPS_KNOWN_HOSTS`. |
 
 `deploy-frontend.sh` hace esto, en orden:
 
@@ -22,6 +22,8 @@
 4. `docker compose up -d --no-deps frontend`.
 
 **Para frenar un deploy**, cancelá el run en GitHub Actions antes de que arranque el job de deploy.
+
+**La llave del servidor se verifica.** `VPS_KNOWN_HOSTS` es la línea de `known_hosts` con la llave pública del VPS, cargada a mano como secreto del repo. El workflow entra con `StrictHostKeyChecking=yes`: si el servidor presenta otra llave, no se despliega, y sin el secreto el deploy falla a propósito. Antes hacía `ssh-keyscan` en cada deploy y aceptaba cualquier llave. Cómo obtener y verificar la línea: `docs/despliegue.md` del backend, «Cómo entra la CI al VPS». El valor no va en el repo: este repo es público.
 
 ## En el VPS
 
