@@ -27,6 +27,7 @@ El sistema pide **una sola clave**, sin usuario. Quien la controla es la API (ba
 
 ## PDF de los comprobantes
 
+- **El enlace del QR para el cliente no pide sesión**: es `/api/publico/c/<token>` del backend y lo abre el celular del cliente. Crear o ver el enlace sí la pide (lo hace el diálogo, con `fetchFacturacion`).
 - **«Descargar PDF» es un link a la API**, así el navegador lo abre en otra pestaña con su nombre de archivo.
 - **Clic común:**
   1. abre la pestaña en el clic (si se abre después, el navegador la bloquea);

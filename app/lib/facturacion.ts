@@ -631,3 +631,21 @@ export async function articuloPorCodigo(codigo: string): Promise<ArticuloVincula
   const a = res.data.articulo;
   return a ? { id: a.id, marca: a.marca, codigo: a.codigo, cantidad: a.cantidad } : null;
 }
+
+// ---------------------------------------------------------------------------
+// QR para el cliente (enlace público del comprobante)
+// ---------------------------------------------------------------------------
+
+// GET /api/facturacion/comprobantes/:id/enlace-publico. `url` abre el PDF sin
+// entrar al sistema (GET /api/publico/c/:token del backend); `qrSvg` es esa
+// URL como QR, negro sobre blanco. El backend crea el enlace la primera vez y
+// después devuelve siempre el mismo. 409 si el comprobante no está
+// autorizado; 503 si falta URL_PUBLICA en el servidor.
+export type EnlacePublico = { url: string; qrSvg: string };
+
+export async function obtenerEnlacePublico(id: number): Promise<EnlacePublico> {
+  const res = await fetchFacturacion<EnlacePublico>(`/api/facturacion/comprobantes/${id}/enlace-publico`, {
+    cache: "no-store",
+  });
+  return res.data;
+}
